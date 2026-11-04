@@ -84,6 +84,11 @@ function connect(view) {
   await manager.open({ panel: restored, source, state: { conversationSlot: 1, conversationSessionId: 'restore-session', cwd } });
   const recovered = manager.windows.get(1).view;
   assert.equal(recovered.resumeTarget, 'restore-session'); assert.equal(recovered.draftStore.read(cwd).text, 'first draft'); assert.equal(recovered.connections.closed, false);
+  await recovered.queuePersistence.save(recovered.queue);
+  const recoveredQueue = structuredClone(storage.get('dshPanel.conversation.1:dshPanel.queue.v1'));
+  first.queue.add(require('../src/panel/queue').snapshotMessage('late closed-tab completion'), { cwd, sessionId: 'closed-session' }, 'late-request');
+  await first.queuePersistence.save(first.queue);
+  assert.deepEqual(storage.get('dshPanel.conversation.1:dshPanel.queue.v1'), recoveredQueue, 'Late writes from a closed tab must not overwrite a reused slot');
   const choices = commandChoices('', { busy: true }); assert.equal(choices.find(item => item.name === 'new').disabled, false); assert.equal(choices.find(item => item.name === 'model').disabled, true);
   while (manager.windows.size < MAX_CONVERSATIONS) await manager.open({ source });
   assert.equal(await manager.open({ source }), false); assert.equal(manager.windows.size, MAX_CONVERSATIONS); assert.equal(notices.length, 1);

@@ -425,7 +425,7 @@ class DoorClient extends EventEmitter {
    *
    * `dsh-door/sessions/list`：内核没有公开的「列历史」方法，会话文件位于磁盘上，
    * 由该插件读盘应答（需要该插件 0.0.8 及以上版本；较低版本会返回 -32601，
-   * 上层应按「插件版本过低」翻译，或由上层自行读盘，见 `src/dsh/sessions.js`）。
+   * 上层应提示连接当前配套版本；离线列表仅使用已缓存摘要）。
    *
    * @returns {Promise<{sessions: object[], skipped: number}>}
    */

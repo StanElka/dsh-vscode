@@ -49,7 +49,7 @@ const suites = [
   { name: 'Webview 消息信封', file: 'test/webview-protocol.js', always: true },
   { name: '待发送队列持久恢复', file: 'test/queue-recovery.js', always: true },
   { name: '候选包回归入口隔离', file: 'test/candidate-regression.js', always: true },
-  { name: '断线历史范围与格式降级', file: 'test/history-offline.js', always: true },
+  { name: '离线历史摘要与连接边界', file: 'test/history-cache-offline.js', always: true },
   { name: '历史按页加载与缓存后台刷新', file: 'test/history-loading.js', always: true },
   { name: 'DSH 归档过滤和状态同步', file: '../dsh-door/test/history-archive.js', always: true },
   { name: '归档跨面板通知与重连缓存校验', file: 'test/history-sync.js', always: true },
@@ -87,7 +87,7 @@ const suites = [
   { name: '编辑器账号目录与进程隔离', file: 'test/editor-isolation.js', always: true },
   { name: '静态契约', file: 'test/static.js', always: true },
   { name: '该插件的帧解析（纯函数）', file: '../dsh-door/test/frames.js', always: true },
-  { name: '该插件的会话读取（纯函数）', file: '../dsh-door/test/sessions.js', always: true },
+  { name: '该插件的历史事件投影（纯函数）', file: '../dsh-door/test/history-events.js', always: true },
   { name: '该插件的端口判定（纯函数）', file: '../dsh-door/test/port.js', always: true },
   { name: '该插件的模型选择与状态（纯函数）', file: '../dsh-door/test/model-status.js', always: true },
   // ACP 接入点插件（dsh-acp-door）的权限预设旁路方法（0.0.12 版）：清单来自用户可配置的档，形状不能假设。
@@ -96,9 +96,6 @@ const suites = [
   { name: '该插件的连接生命周期（纯函数）', file: '../dsh-door/test/lifecycle.js', always: true },
   // 面板侧把内核的清单转换为中文界面（标签与桌面端逐字一致）。
   { name: '权限预设的界面翻译（纯函数）', file: 'test/permission.js', always: true },
-  // 两份「历史会话读取」实现（该插件的 ESM 版 + 面板的 CJS 版）必须逐项一致 ——
-  // 见 test/sessions-parity.js 的说明：只修改其中一边，该断言首先失败。
-  { name: '两份会话读取实现是否一致', file: 'test/sessions-parity.js', always: true },
   { name: 'Markdown 渲染器', file: 'test/markdown.js', always: true },
   { name: '编辑器上下文拼块（纯函数）', file: 'test/blocks.js', always: true },
   { name: '会话层边界（假客户端）', file: 'test/session.js', always: true },

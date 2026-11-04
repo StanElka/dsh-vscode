@@ -47,8 +47,7 @@ import {
   sessionCloseTarget,
   waitForMount,
 } from './frames.js';
-import { resolveSessionsRoot } from './sessions.js';
-import { createLegacyHistory, createSessionQueryHistory } from './kernel/history.js';
+import { createSessionQueryHistory } from './kernel/history.js';
 import { archiveSnapshot, registerHistorySession } from './kernel/history-archive.js';
 import { createPermissionHandler } from './kernel/permissions.js';
 import { handleTextGeneration, rememberTextModelRequest, textGenerationSupported } from './kernel/text-generation.js';
@@ -428,8 +427,7 @@ function rememberSessionRequest(line, state, diag) {
  * 就地应答该插件自身的历史会话请求（`dsh-door/sessions/list|get`）。
  *
  * 由该插件应答而不转发 ACP 的原因：ACP 没有「列出历史会话」方法。DSH 0.2
- * 通过公开的 sessionQuery 服务读取 v4；旧内核没有该服务时，才回退到
- * lib/sessions.js 的只读 v3 磁盘适配。
+ * 通过公开的 sessionQuery 服务读取会话，持久格式由内核管理。
  * 应答帧经 `state.respond` 走唯一的写出口，请求帧本身**被丢弃且不转发**
  * （内核会将其视为无法识别的方法并报错，不产生任何效果）。
  *
@@ -452,8 +450,7 @@ async function handleDoorSessions(line, state, diag) {
  * 清单与切换均来自内核的 `@deepseek-ai/dsh-permission-presets` 服务
  * （与桌面端的「权限」选择器使用同一份数据），该插件仅做转接：
  *
- *   - `get` → DSH 0.2 使用进程级 `catalog()`，DSH 0.1 使用
- *     `selectFor(permissionState(session))`，
+ *   - `get` → 使用进程级 `catalog()`，
  *     返回 `{currentValue, options, defaultPreset}`；
  *   - `set` → 先经 `resolve()` 校验（无法识别的预设名会抛出异常，原话转给客户端），
  *     再调用 `set(session, value)`，随后**重新读取一次**返回给客户端。
@@ -587,6 +584,7 @@ function isPresetLocked(error) {
  *   `DSH_ACP_DOOR_DIAG`）。不配置则完全不写入。
  */
 export function apply(ctx, config = {}) {
+  if (ACP_RUNTIME_VERSION !== '0.2.1-rc.5') throw new Error('dsh-acp-door 需要 DSH ACP 0.2.1-rc.5，请升级内核后重试。');
   registerCompanion(ctx);
   const { host, rejected: rejectedHost } = resolveDoorHost(config);
   const port = resolveDoorPort(config, process.env);
@@ -628,13 +626,13 @@ export function apply(ctx, config = {}) {
     ctx.logger?.warn?.(warning);
   }
 
-  // 历史会话：优先使用 DSH 0.2 的公开 sessionQuery；旧内核回退为只读 v3 文件适配。
-  const sessionsRoot =
-    typeof config.sessionsDir === 'string' && config.sessionsDir
-      ? config.sessionsDir
-      : resolveSessionsRoot();
-  const legacySessionsHandler = createLegacyHistory(sessionsRoot);
-  let sessionsHandler = legacySessionsHandler;
+  // History remains unavailable until the current kernel service is ready.
+  const unavailableHistory = {
+    kind: 'unavailable',
+    async list() { throw new Error('DSH 历史服务尚未就绪，请稍后重试。'); },
+    async get() { throw new Error('DSH 历史服务尚未就绪，请稍后重试。'); },
+  };
+  let sessionsHandler = unavailableHistory;
   ctx.inject(['sessionQuery'], (queryCtx) => {
     const handler = createSessionQueryHistory(queryCtx.sessionQuery, diag, { getWorkspaceRegistry: () => queryCtx.get?.('workspaceRegistry') });
     if (!handler) {
@@ -645,12 +643,12 @@ export function apply(ctx, config = {}) {
         async get() { throw new Error('当前内核的历史接口无法识别'); },
       };
       sessionsHandler = unavailable;
-      return () => { if (sessionsHandler === unavailable) sessionsHandler = legacySessionsHandler; };
+      return () => { if (sessionsHandler === unavailable) sessionsHandler = unavailableHistory; };
     }
     sessionsHandler = handler;
     diag('历史会话已接入内核 sessionQuery 服务');
     return () => {
-      if (sessionsHandler === handler) sessionsHandler = legacySessionsHandler;
+      if (sessionsHandler === handler) sessionsHandler = unavailableHistory;
     };
   });
 
@@ -729,7 +727,7 @@ export function apply(ctx, config = {}) {
     diag('客户端已接入');
 
     // 显式配置完整时使用配置；否则读取 DSH 设置中用户当前选择的默认模型。
-    // `ctx.get()` 是 Cordis 对可选服务的安全读取方式：旧版 DSH 没有该服务时返回
+    // `ctx.get()` 是 Cordis 对可选服务的安全读取方式：配置集未提供服务时返回
     // undefined，不把它列为硬依赖，接入点仍可依靠显式 provider/model 运行。
     let defaultModelService;
     try {
@@ -843,7 +841,6 @@ export function apply(ctx, config = {}) {
         mountPresetOnNewSessions(child, { defaultPreset: preset, state, diag });
         // DSH 0.2 的标准 ACP 有意只投影已提交的完整消息；这里订阅同进程的
         // transient stream，并只向创建/恢复这些会话的客户端发送正文与思考增量。
-        // DSH 0.1 不会触发该事件，因此无需版本分支即可自然回退。
         child.on('agent/assistant-stream', ({ agent, frame } = {}) => {
           const sessionId = agent?.session?.id ?? agent?.id;
           if (!agent || !state.agents.has(agent) || !state.sessions.has(sessionId)) return;
@@ -905,7 +902,7 @@ export function apply(ctx, config = {}) {
         }),
       ]);
       clearTimeout(timer);
-      diag(settingsReady ? 'DSH 用户设置已加载' : '等待设置服务到期，按旧版兼容路径继续');
+      diag(settingsReady ? 'DSH 用户设置已加载' : '设置服务尚未就绪，连接后将报告实际模型状态');
     }
     if (disposed) return;
     server.listen(port, host, () => {

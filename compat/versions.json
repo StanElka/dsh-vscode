@@ -2,8 +2,8 @@
   "schemaVersion": 2,
   "currentRelease": {
     "status": "pending",
-    "panel": "0.19.0",
-    "door": "0.7.0",
+    "panel": "0.19.1",
+    "door": "0.7.1",
     "sdk": "0.1.1",
     "evidence": []
   },
@@ -14,17 +14,19 @@
   },
   "versions": [
     {
-      "dsh": "0.2.1-rc.3",
+      "dsh": "0.2.1-rc.5",
       "distribution": "npm",
       "status": "pending",
       "evidence": []
     },
     {
-      "dsh": "0.2.1-rc.3",
+      "dsh": "0.2.1-rc.5",
       "distribution": "desktop",
       "status": "pending",
       "evidence": []
-    },
+    }
+  ],
+  "historical": [
     {
       "dsh": "0.1.5-rc.2",
       "distribution": "npm",

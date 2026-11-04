@@ -70,8 +70,7 @@ export class NdjsonBuffer {
 }
 
 /**
- * 把 DSH 0.2 的 assistant stream 帧收窄成稳定、最小的通知形状。
- * 旧版 DSH 不产生这些帧，调用方自然继续使用标准 ACP 的完整消息。
+ * 把当前内核的 assistant stream 帧收窄成稳定、最小的通知形状。
  *
  * @param {string} sessionId
  * @param {unknown} frame

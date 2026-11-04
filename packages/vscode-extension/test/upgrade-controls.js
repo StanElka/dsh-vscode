@@ -1,14 +1,12 @@
 'use strict';
-const assert = require('node:assert/strict'), fs = require('node:fs'), fsp = require('node:fs/promises');
-const os = require('node:os'), path = require('node:path'), zlib = require('node:zlib'), { EventEmitter } = require('node:events');
-const { pathToFileURL } = require('node:url');
+const assert = require('node:assert/strict'), fs = require('node:fs');
+const os = require('node:os'), path = require('node:path'), { EventEmitter } = require('node:events');
 const { DshSession } = require('../src/dsh/session');
 const { modelDiagnostics } = require('../src/dsh/model-diagnostics');
 const { describeError } = require('../src/dsh/errors');
 const { normalizeDraft, draftKey, TTL, MAX_BYTES } = require('../src/panel/drafts');
 const { MessageQueue, snapshotMessage } = require('../src/panel/queue');
 const { createReviewBudget } = require('../../../tools/bridge/review-budget.cjs');
-const history = require('../src/dsh/sessions');
 const { cancelHistoryRequest, runHistoryRequest } = require('../../dsh-door/lib/history-requests.cjs');
 const { DoorClient } = require('../src/door/client');
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-upgrade-'));
@@ -124,31 +122,6 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-upgrade-'));
       assert.equal(channel.historyReads.size, 0); assert.equal(wire[1].params.signal, undefined);
       assert.equal(wire[2].method, '$/cancel_request'); assert.equal(wire[2].params.requestId, wire[1].id);
     } finally { transport.close(); net.connect = originalConnect; }
-    const dir = path.join(root, 'sessions', 'group'); fs.mkdirSync(dir, { recursive: true });
-    const write = (id, title, group = dir) => { const folder = path.join(group, id); fs.mkdirSync(folder, { recursive: true }); const file = path.join(folder, history.SESSION_FILE);
-      fs.writeFileSync(file, zlib.zstdCompressSync(Buffer.from([{ type: 'session', id, cwd: root }, { type: 'session/title', data: { title } }, { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'text', text: 'x'.repeat(64000) }] } }].map(item => JSON.stringify(item)).join('\n')))); return file; };
-    for (let i = 0; i < 150; i++) write(`s-${i}`, `Title ${i}`);
-    const sessionsRoot = path.dirname(dir); let reads = 0, turns = 0;
-    const oldRead = fsp.readFile; fsp.readFile = async (...args) => { reads++; return oldRead(...args); };
-    const pulse = setInterval(() => turns++, 1);
-    try {
-      let result = await history.listSessionsAsync(sessionsRoot, { query: 'Title', limit: 500 }); assert.equal(result.total, 150); assert.equal(reads, 150); assert(turns > 0, 'Allow other work while decoding');
-      result.sessions[0].title = 'changed by caller'; reads = 0;
-      result = await history.listSessionsAsync(sessionsRoot, { query: 'Title', limit: 500 }); assert.equal(reads, 0, 'Reuse summaries without rereading message bodies'); assert.equal(result.total, 150);
-      write('s-0', 'Changed title'); reads = 0; result = await history.listSessionsAsync(sessionsRoot, { query: 'Changed' }); assert.equal(result.total, 1); assert.equal(reads, 1);
-      fs.unlinkSync(path.join(dir, 's-0', history.SESSION_FILE)); result = await history.listSessionsAsync(sessionsRoot, { query: 'Changed' }); assert.equal(result.total, 0);
-      const aborted = new AbortController(); const pending = history.listSessionsAsync(sessionsRoot, { query: 'Title', signal: aborted.signal }); aborted.abort(); await assert.rejects(pending, /abort/i);
-      const other = await import(pathToFileURL(path.resolve(__dirname, '../../dsh-door/lib/sessions.js')).href);
-      assert.deepEqual(await other.listSessionsAsync(sessionsRoot, { query: 'Title', limit: 10 }), await history.listSessionsAsync(sessionsRoot, { query: 'Title', limit: 10 }));
-      assert.deepEqual(await other.getSessionAsync(sessionsRoot, 's-1'), await history.getSessionAsync(sessionsRoot, 's-1'));
-      const concurrentRoot = path.join(root, 'concurrent');
-      for (let i = 0; i < 4; i++) write(`c-${i}`, `Concurrent ${i} ` + 'x'.repeat(400000), path.join(concurrentRoot, 'group'));
-      const searches = await Promise.all(Array.from({ length: 8 }, () => history.listSessionsAsync(concurrentRoot, { query: 'Concurrent' })));
-      assert(searches.every(item => item.total === 4)); reads = 0;
-      assert.equal((await history.listSessionsAsync(concurrentRoot, { query: 'Concurrent' })).total, 4);
-      assert.equal(reads, 0, 'Concurrent searches must not count the same cached summary repeatedly');
-    } finally { fsp.readFile = oldRead; clearInterval(pulse); }
-    assert.equal(fs.readFileSync(path.resolve(__dirname, '../src/dsh/sessions-async.cjs'), 'utf8'), fs.readFileSync(path.resolve(__dirname, '../../dsh-door/lib/sessions-async.cjs'), 'utf8'));
     console.log('PASS model selection, draft boundaries, review budgets, cached history, invalidation, cancellation, disconnect and request limits');
   } finally { fs.rmSync(root, { recursive: true, force: true }); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

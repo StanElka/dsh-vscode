@@ -3,16 +3,26 @@
   "chatBaseline": "1.91.1",
   "currentRelease": {
     "status": "pending",
-    "panel": "0.19.0",
-    "door": "0.7.0",
+    "panel": "0.19.1",
+    "door": "0.7.1",
     "sdk": "0.1.1",
     "evidence": []
   },
   "platform": "win32",
   "minimum": "1.90.2",
-  "status": "passed",
-  "evidence": "compat/evidence/public-editor-1.90.2-door-0.5.2-panel-0.17.0.json",
+  "status": "pending",
   "supported": [
+    {
+      "editor": "1.144.1",
+      "status": "pending"
+    }
+  ],
+  "historical": [
+    {
+      "editor": "1.90.2",
+      "status": "passed",
+      "evidence": "compat/evidence/public-editor-1.90.2-door-0.5.2-panel-0.17.0.json"
+    },
     {
       "editor": "1.91.1",
       "status": "passed",

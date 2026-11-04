@@ -744,8 +744,8 @@ function assertionsScript(scene) {
       historyButtonLife.click();
       receiveLife({ type: 'history', via: 'cache', cachedAt: Date.now(), limitation: '连接不可用', sessions: [] });
       assert('离线缓存展示摘要时间与连接限制', document.getElementById('history-meta').textContent.indexOf('摘要缓存') >= 0 && document.getElementById('history-meta').title.indexOf('缓存时间：') >= 0 && document.getElementById('history-meta').title.indexOf('连接不可用') >= 0);
-      receiveLife({ type: 'history', unsupported: 2, emptyReason: 'unsupported-format', sessions: [] });
-      assert('新版本地历史限制不会显示数据为空', document.getElementById('history-list').textContent.indexOf('连接内核') >= 0 && document.getElementById('history-list').textContent.indexOf('暂无历史') < 0);
+      receiveLife({ type: 'history', error: '请连接 DSH 后读取历史；离线时仅可查看已缓存的列表摘要。' });
+      assert('连接缺失不会显示历史数据为空', document.getElementById('history-list').textContent.indexOf('请连接 DSH') >= 0 && document.getElementById('history-list').textContent.indexOf('暂无历史') < 0);
       keyLife('Escape');
     }
     if (EXPECT.perf) {
@@ -1109,9 +1109,22 @@ function assertionsScript(scene) {
       assert('点击下一页才请求后续 30 条',nextRequest.offset===30 && nextRequest.limit===30);
       window.postMessage({type:'history',requestId:nextRequest.requestId,total:205,offset:30,nextOffset:60,sessions:[{id:'paged-next',title:'Next page'}]},'*');
       await new Promise(function(resolve){setTimeout(resolve,30);});
-      assert('分页统计及上一页可用',!document.getElementById('history-prev').disabled&&document.getElementById('history-page').textContent.indexOf('31')===0);
+      assert('分页页码和会话总数明确，上一页可用',!document.getElementById('history-prev').disabled&&document.getElementById('history-page').textContent==='第 2 / 7 页\\n共 205 段会话');
       document.getElementById('history-prev').click();
       assert('上一页回到前一页',window.__received.filter(function(message){return message.type==='historyList';}).pop().offset===0);
+
+      var firstRequestAfterPrev=window.__received.filter(function(message){return message.type==='historyList';}).pop();
+      window.postMessage({type:'history',requestId:firstRequestAfterPrev.requestId,total:205,offset:0,nextOffset:30,sessions:[{id:'paged',title:'Current page'}]},'*');
+      await new Promise(function(resolve){setTimeout(resolve,30);});
+      document.getElementById('history-next').click();
+      var historyRequestIdForEmpty=window.__received.filter(function(message){return message.type==='historyList';}).pop().requestId;
+      window.postMessage({type:'history',requestId:historyRequestIdForEmpty,total:0,offset:30,sessions:[]},'*');
+      await new Promise(function(resolve){setTimeout(resolve,30);});
+      var emptyRequest=window.__received.filter(function(message){return message.type==='historyList';}).pop();
+      assert('历史被清空后自动回到第一页',emptyRequest.requestId!==historyRequestIdForEmpty&&emptyRequest.offset===0&&emptyRequest.refresh===true);
+      window.postMessage({type:'history',requestId:emptyRequest.requestId,total:0,offset:0,sessions:[]},'*');
+      await new Promise(function(resolve){setTimeout(resolve,30);});
+      assert('空历史禁用翻页且不循环刷新',document.getElementById('history-prev').disabled&&document.getElementById('history-next').disabled&&window.__received.filter(function(message){return message.type==='historyList';}).pop().requestId===emptyRequest.requestId);
 
       search.value = ''; project.checked = false;
       var groupedCards = [

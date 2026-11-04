@@ -137,6 +137,17 @@ function doorFiles() {
   return [...new Set(out)];
 }
 
+/** Match package verification: text line endings may change during npm installation. */
+function comparableContent(file) {
+  const bytes = fs.readFileSync(file);
+  if (bytes.includes(0)) return bytes;
+  try {
+    return Buffer.from(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes).replace(/\r\n/g, '\n'));
+  } catch {
+    return bytes;
+  }
+}
+
 /**
  * 核对已安装的该插件是否与源码一致；不一致时列出不同的文件。
  *
@@ -151,7 +162,7 @@ function doorDrift() {
     const src = path.join(DOOR_SRC, rel);
     const installed = path.join(DOOR_INSTALLED, rel);
     try {
-      if (!fs.existsSync(installed) || !fs.readFileSync(src).equals(fs.readFileSync(installed))) {
+      if (!fs.existsSync(installed) || !comparableContent(src).equals(comparableContent(installed))) {
         drift.push(rel);
       }
     } catch {
@@ -260,7 +271,7 @@ function inspectDoor(profile = PROFILE) {
   for (const rel of doorFiles()) {
     const src = path.join(DOOR_SRC, rel);
     const installed = path.join(base, rel);
-    if (!fs.existsSync(installed) || !fs.readFileSync(src).equals(fs.readFileSync(installed))) {
+    if (!fs.existsSync(installed) || !comparableContent(src).equals(comparableContent(installed))) {
       drift.push(rel);
     }
   }

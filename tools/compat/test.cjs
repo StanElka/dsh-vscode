@@ -138,7 +138,7 @@ async function run(options) {
     });
     const sessionId = session.sessionId;
     const directText = (await client.doorStatus()).capabilities?.textGeneration;
-    const directRequired = ['0.2.1-rc.2', '0.2.1-rc.3'].includes(report.runtime.acpVersion);
+    const directRequired = report.runtime.acpVersion === '0.2.1-rc.5';
     const assertTextRequests = (requests, model) => {
       assert(requests.length > 0, '直接生成未到达模型服务');
       for (const request of requests) {
@@ -214,7 +214,7 @@ async function run(options) {
       session.on('text', ({ delta }) => { text += delta; updates += 1; });
       await bounded(session.send('COMPAT_STREAM'));
       assert.equal(text, 'COMPAT_OK');
-      if (semver.gte(runtime.version, '0.2.0-rc.1')) assert(updates >= 2, `没有收到实时增量：${updates}`);
+      assert(updates >= 2, `没有收到实时增量：${updates}`);
       return { text, updates };
     });
     let permissionRequests = 0;

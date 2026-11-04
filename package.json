@@ -12,8 +12,6 @@
     "url": "https://github.com/elk-9527/dsh-vscode.git"
   },
   "scripts": {
-    "probe": "node spike/acp-probe.mjs",
-    "probe:edit": "node spike/acp-probe.mjs --edit",
     "test": "node packages/vscode-extension/test/run-all.js --all",
     "test:ext": "node packages/vscode-extension/test/run-all.js --all",
     "test:door": "node packages/dsh-door/test/run-all.js",

@@ -8,13 +8,13 @@ const path = require('node:path');
 
 const { randomUUID } = require('node:crypto');
 const { runDshAsync } = require('./locate');
-const { resolveSessionsRoot } = require('../dsh/sessions');
+const { resolveDshHome } = require('./home');
 
 const SAFE_PROFILE = /^[A-Za-z0-9._-]+$/;
 const OFFICIAL_RUNTIME_BUNDLE = /^@deepseek-ai\/dsh-[A-Za-z0-9._-]+$/;
 
 function profileDirectory(profile, { homedir = os.homedir(), env = process.env } = {}) {
-  const home = path.dirname(resolveSessionsRoot({ homedir, env }));
+  const home = resolveDshHome({ homedir, env });
   return path.join(home, 'profiles', profile);
 }
 

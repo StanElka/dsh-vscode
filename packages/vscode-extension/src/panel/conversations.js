@@ -34,9 +34,14 @@ class ConversationPanels {
       return false;
     }
     const storage = this.options.workspaceState;
+    let retired = false, storageWrites = Promise.resolve();
     const workspaceState = {
       get: key => storage?.get(`dshPanel.conversation.${slot}:${key}`),
-      update: (key, value) => storage?.update(`dshPanel.conversation.${slot}:${key}`, value),
+      update: (key, value) => {
+        if (retired) return Promise.resolve();
+        storageWrites = storageWrites.catch(() => {}).then(() => storage?.update(`dshPanel.conversation.${slot}:${key}`, value));
+        return storageWrites;
+      },
     };
     const target = panel || this.vscode.window.createWebviewPanel(CONVERSATION_VIEW, `DSH 对话 ${slot + 1}`,
       { viewColumn: this.vscode.ViewColumn.Beside, preserveFocus: false }, { enableScripts: true, retainContextWhenHidden: true });
@@ -48,7 +53,12 @@ class ConversationPanels {
     const dispose = () => {
       if (this.windows.get(slot) !== item) return;
       this.windows.delete(slot);
-      const flush = Promise.allSettled([view.draftStore?.flush(), view.queuePersistence?.writes]);
+      const flush = Promise.allSettled([view.draftStore?.flush(), view.queuePersistence?.writes]).then(() => {
+        // A stopped turn may settle after disposal. Drain submitted writes and
+        // revoke this view before another tab reuses its persistence slot.
+        retired = true;
+        return storageWrites.catch(() => {});
+      });
       this.retiring.add(flush);
       void flush.finally(() => this.retiring.delete(flush));
       for (const cleanup of [() => view.session?.stop(), () => view.tests?.dispose(), () => view.workflow?.dispose(), () => view.dispose()]) {

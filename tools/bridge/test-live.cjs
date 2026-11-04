@@ -47,7 +47,7 @@ async function run() {
     for (const k of Object.keys(proxy)) delete process.env[k];
     const runtimeHome = path.join(work, 'home');
     process.env.DSH_HOME = runtimeHome; fs.mkdirSync(runtimeHome, { recursive: true });
-    const runtime = resolveRuntime({ dsh: versionArgument || '0.2.0-rc.2' }); report.runtime = runtime;
+    const runtime = resolveRuntime({ dsh: versionArgument || '0.2.1-rc.5' }); report.runtime = runtime;
     const cwd = path.join(work, 'workspace'); fs.mkdirSync(cwd);
     fs.writeFileSync(path.join(cwd, 'sample.js'), 'export function sum(a, b) { return a - b; }\n');
     fs.writeFileSync(path.join(cwd, 'context-git.txt'), 'context-base\n');

@@ -44,7 +44,7 @@ const {
 const { resolveLoopbackHost } = require('../door/endpoint');
 const { desktopProfilePatchArgs, syncPanelProfilePlugins } = require('../door/setup');
 const { renderHtml, makeNonce } = require('../panel/html');
-const localSessions = require('../dsh/sessions');
+const { resolveDshHome } = require('../door/home');
 const { kernelManager } = require('../panel/kernel-manager');
 const { readUserSetting } = require('./settings');
 
@@ -56,7 +56,7 @@ function pathIsInside(target, base) {
   return Boolean(rel) && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
 }
 
-/** 该错误是否为「对端不存在此方法」（该插件 0.0.8 之前未提供的历史旁路方法）。 */
+/** 该错误是否为「对端不存在此方法」。 */
 function isMissingMethod(error, text) {
   return Boolean(error && (error.code === -32601 || /-32601/.test(text)))
     || /method not found|不支持.*dsh-door\/sessions/i.test(String(text || ''));
@@ -206,15 +206,6 @@ class DshPanelView {
      * @type {string|undefined}
      */
     this.permissionNotice = undefined;
-    /**
-     * 本轮连接中历史会话的读取来源：'door' | 'local' | undefined（尚未确定）。
-     *
-     * 缓存该字段是为了避免每次打开历史会话都发起一次注定失败的往返：该插件版本过低属于**常态**
-     * （用户配置集中的该插件会被桌面端重写回旧版），第一次收到 -32601 之后即改用本地读取，
-     * 本轮连接中不再向该插件查询。重连时清除，使已升级该插件的用户有机会恢复经由该插件读取。
-     * @type {'door'|'local'|undefined}
-     */
-    this.historyVia = undefined;
     /** 每个客户端在面板层注册的 close 处理器；主动拆除前需要先移除。 */
     this.clientCloseHandlers = new WeakMap();
     /**
@@ -1721,19 +1712,13 @@ class DshPanelView {
 
   // ── 历史会话 ──────────────────────────────────────────
   //
-  // 数据位于本机 `$DSH_HOME/sessions`。两条读取途径：
-  //   1. ACP 接入点插件（dsh-acp-door）0.0.8+ 的旁路方法 `dsh-door/sessions/list|get`；
-  //   2. 面板自行读取本机磁盘。
-  //
-  // 第 2 条途径必要的原因：接入点插件安装在用户配置集中，而**该配置集由 DSH 桌面端自行
-  // 管理**，接入点过旧或旁路方法不可用时仍需提供本地读取路径。
-  // 面板与内核位于同一台机器，历史读取无需启动或修改另一套内核配置。
+  // 完整历史只由当前 DSH 内核读取；断线时可显示同一范围的摘要缓存。
 
   /** 缓存按内核来源、工作目录、搜索和页码隔离。 */
   historyCacheContext() {
     this.historyCache ||= new HistorySummaryCache(this.workspaceState);
     const config = this.config();
-    return { cache: this.historyCache, source: JSON.stringify([localSessions.resolveSessionsRoot(), config.host, config.port]) };
+    return { cache: this.historyCache, source: JSON.stringify([path.join(resolveDshHome(), 'sessions'), config.host, config.port]) };
   }
 
   observeHistory(client) {
@@ -1778,24 +1763,15 @@ class DshPanelView {
 
   /** 读取一次历史；完整回放始终读取实际会话，不使用摘要缓存。 */
   async readHistory(kind, id, options = {}) {
-    const localRoot = localSessions.resolveSessionsRoot();
     const client = this.client;
     const { cache, source } = this.historyCacheContext();
     let remoteError;
-
-    // 能够向该插件查询时即通过该插件查询：这是本机 DSH 返回的正式数据来源。
-    // `historyVia === 'local'` 表示本轮连接中已确认该插件没有此方法，
-    // 因此不再在每次打开历史会话时发起一次注定失败的往返。
-    if (this.historyVia !== 'local' && client && client.isConnected) {
+    if (client?.isConnected) {
       try {
-        const received = kind === 'list'
+        const result = kind === 'list'
           ? await client.listHistory(options)
           : await client.getHistory(String(id || ''));
-        const result = kind === 'list' && typeof received?.archiveStateKnown !== 'boolean'
-          ? { ...received, archiveStateKnown: false, archiveSupported: false,
-            limitation: '归档同步暂不可用，请更新接入点并重启 DSH。' } : received;
         options.signal?.throwIfAborted();
-        this.historyVia = 'door';
         if (kind === 'list') {
           try { await cache.put(source, options, result); }
           catch (error) { this.log('warn', `缓存历史摘要失败：${error.message}`); }
@@ -1806,35 +1782,21 @@ class DshPanelView {
         const text = this.errText(error);
         if (!isMissingMethod(error, text) && client.isConnected && !/ECONNREFUSED|ECONNRESET|ETIMEDOUT|EPIPE|connection.*closed|连接已关闭|连接已断开/i.test(`${error.code || ''} ${text}`)) throw error;
         remoteError = error;
-        if (isMissingMethod(error, text)) {
-          this.historyVia = 'local';
-          this.log('info', '历史会话旁路方法不可用，改为只读本地旧格式历史');
-        }
       }
     }
     if (kind === 'list') {
       const cached = cache.get(source, options);
       if (cached) return { result: cached, via: 'cache' };
     }
-    if (!localSessions.hasZstdSupport()) {
-      throw new Error('本机 Node 不支持 zstd 压缩格式，无法解析会话文件');
-    }
-    const result = kind === 'list'
-      ? await localSessions.listSessionsAsync(localRoot, options)
-      : await localSessions.getSessionAsync(localRoot, String(id || ''), options);
-    if (kind === 'list') {
-      result.offline = !client?.isConnected || Boolean(remoteError);
-      if (!result.limitation) result.limitation = '当前只显示可本地读取的旧格式会话；新版完整历史需要连接 DSH 内核。';
-      if (result.unsupported && !result.sessions.length) result.emptyReason = 'unsupported-format';
-      else if (!result.sessions.length) result.emptyReason = 'local-empty';
-    }
-    return { result, via: 'local' };
+    throw new Error(remoteError && isMissingMethod(remoteError, this.errText(remoteError))
+      ? '当前接入点缺少历史接口，请安装当前配套版本并重启 DSH。'
+      : '请连接 DSH 后读取历史；离线时仅可查看已缓存的列表摘要。');
   }
 
   /**
    * 把历史会话清单发送给界面。
    *
-   * 接入点插件版本过低时，上述本机读取途径会自动补上，不要求用户修改桌面端配置集。
+   * 完整历史依赖内核服务；离线列表只能使用此前成功读取的摘要缓存。
    */
   async sendHistoryList(request = {}) {
     if (this.disposed) return;
@@ -1853,11 +1815,11 @@ class DshPanelView {
         const sessions = Array.isArray(result?.sessions) ? result.sessions : [];
         if (via !== 'cache' && result?.archiveStateKnown) this.historyArchiveRevision = result.archiveRevision;
         this.post({ type: 'history', via, sessions, requestId, currentCwd, skipped: result?.skipped || 0, total: result?.total, offset: result?.offset || 0, nextOffset: result?.nextOffset,
-          cachedAt: result?.cachedAt, cacheScope: result?.cacheScope, limited: result?.limited, limitation: result?.limitation, offline: result?.offline, unsupported: result?.unsupported, emptyReason: result?.emptyReason,
+          cachedAt: result?.cachedAt, cacheScope: result?.cacheScope, limited: result?.limited, limitation: result?.limitation,
           archiveSupported: result?.archiveSupported, archiveStateKnown: result?.archiveStateKnown, workspaceStateKnown: result?.workspaceStateKnown, archiveRevision: result?.archiveRevision,
-          queryUnsupported: (options.query || options.cwd || options.offset) && result?.offset === undefined, ...extra });
+          ...extra });
       };
-      if (request.refresh !== true && this.historyVia !== 'local' && this.client?.isConnected) {
+      if (request.refresh !== true && this.client?.isConnected) {
         cachedPage = cache.get(source, options, { refreshing: true });
         if (cachedPage && cachedPage.archiveStateKnown !== true) cachedPage = undefined;
         if (cachedPage?.archiveStateKnown && cachedPage.archiveRevision !== this.historyArchiveRevision && typeof this.client.historyState === 'function') {
@@ -1871,7 +1833,7 @@ class DshPanelView {
       const { result, via } = await this.readHistory('list', undefined, { ...options, signal: controller.signal });
       if (controller.signal.aborted) return;
       const sessions = Array.isArray(result && result.sessions) ? result.sessions : [];
-      // 本地读取失败时（目录不可读等）原因会写入 error 字段，不应将其视为「没有历史会话」。
+      // 内核读取失败不能视为「没有历史会话」。
       if (sessions.length === 0 && result && result.error) throw new Error(result.error);
       publish(result, via);
     } catch (error) {
@@ -1961,6 +1923,7 @@ class DshPanelView {
       return;
     }
     if (options.cwd && (!vscode.workspace.isTrusted || !vscode.workspace.getWorkspaceFolder(vscode.Uri.file(options.cwd)))) throw new Error('恢复目录不在受信任工作区');
+    const cwd = options.cwd || this.workdir();
     // 忙碌判断必须早于回放：回放会清空当前转录。若先回放再拒绝恢复，
     // 用户正在进行的回答会被历史内容覆盖，随后到达的增量又混进回放中。
     const previousId = session.sessionId;
@@ -1972,8 +1935,13 @@ class DshPanelView {
     if (replayEpoch !== this.historyReplayEpoch || this.historyReplayFailed || !this.historyReadonly || this.historyId !== id || this.session !== session || !this.client?.isConnected) return false;
     try {
       if (replay?.card?.archived) throw new Error('该会话已归档，请先恢复归档再继续对话。');
+      const historyCwd = replay?.card?.cwd;
+      if (typeof historyCwd === 'string' && historyCwd &&
+          (!path.isAbsolute(historyCwd) || draftKey(path.resolve(historyCwd)) !== draftKey(path.resolve(cwd)))) {
+        throw new Error('该会话属于其他工作目录，请在对应目录打开后接回。');
+      }
       const historyPreset = typeof replay?.card?.preset === 'string' && replay.card.preset.trim() ? replay.card.preset.trim() : undefined;
-      await this.restoreSession(session, String(id || ''), options.cwd || this.workdir(), options.preset || historyPreset);
+      await this.restoreSession(session, String(id || ''), cwd, options.preset || historyPreset);
       if (this.session !== session || this.client !== session.client || !this.client?.isConnected) return false;
       this.workflow?.reset();
       if (previousId && previousId !== session.sessionId) await session.client.closeSession(previousId).catch(error => this.log('warn', `关闭旧会话失败：${this.errText(error)}`));
@@ -2609,8 +2577,6 @@ class DshPanelView {
       this.client = undefined;
     }
     this.doorStatus = undefined;
-    // 下一轮连接重新判定历史会话的读取来源（用户可能在此期间升级了接入点插件）。
-    this.historyVia = undefined;
     // 权限相关说明也重新输出一次（接入点插件可能已升级）。
     this.permissionNotice = undefined;
     this.permissionUnavailable = undefined;

@@ -4,8 +4,7 @@ import { createHash } from 'node:crypto';
 import { rememberImageProtocolRequest, rememberImageProtocolResponse, resolveImageCapabilities, handleImageCapabilities, closeImageCapabilityRequests, projectHistoryImages, handleHistoryImageRead } from '../lib/kernel/images.js';
 import { decorateLine } from '../lib/frames.js';
 import { gatePrompts } from '../lib/index.js';
-import { sessionTranscript as doorTranscript } from '../lib/sessions.js';
-import extensionHistory from '../../vscode-extension/src/dsh/sessions.js';
+import { sessionTranscript as doorTranscript } from '../lib/history-events.js';
 import historyRequests from '../lib/history-requests.cjs';
 
 let passed = 0;
@@ -14,7 +13,7 @@ const attachments = { imageLimits: { maxImageBytes: 1024, maxImagesPerMessage: 4
 const tools = { schemas() { return [{ name: 'send_meme' }, { name: 'image_search' }, { name: 'generate_image' }, { name: 'read_file' }]; } };
 function stateOf() {
   const agent = { ctx: { get(name) { return name === 'tools' ? tools : undefined; } } };
-  return { imageRuntimeVersion: '0.2.1-rc.3', imagePromptEnabled: true, imageAttachments: attachments,
+  return { imageRuntimeVersion: '0.2.1-rc.5', imagePromptEnabled: true, imageAttachments: attachments,
     sessions: new Set(['own']), agentsBySession: new Map([['own', agent]]), textModels: new Map([['own', { provider: 'p', model: 'vision' }]]),
     textLlm: { async resolveModelInfo(provider, model) { return { provider, id: model, inputModalities: ['text', 'image'] }; } } };
 }
@@ -99,7 +98,7 @@ await check('capability queries leave ACP image prompt bytes and ordering unchan
 });
 const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRfkAAAAASUVORK5CYII=', 'base64');
 const ref = { attachmentId: `sha256:${createHash('sha256').update(png).digest('hex')}`, mediaType: 'image/png', width: 1, height: 1, bytes: png.length };
-await check('both history projections preserve image-only user and assistant messages with bounded native refs', async () => {
+await check('history projections preserve image-only user and assistant messages with bounded native refs', async () => {
   const events = [
     { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'image', attachment: { ...ref, name: 'private-display-name.png', extra: 'not-a-supported-field' } }] } },
     { type: 'assistant/message', data: { message: { content: [{ type: 'image', attachment: ref }] } } },
@@ -107,7 +106,7 @@ await check('both history projections preserve image-only user and assistant mes
     { type: 'user/message', data: { source: { kind: 'user' }, content: [{ type: 'image', attachment: { ...ref, bytes: 9 * 1024 * 1024 } }] } },
   ];
   const projected = doorTranscript(events);
-  assert.deepEqual(projected, extensionHistory.sessionTranscript(events));
+  assert.deepEqual(projected, doorTranscript(events));
   assert.deepEqual(projected.entries[0], { kind: 'user', text: '', images: [{ attachment: ref }] });
   assert.deepEqual(projected.entries[1], { kind: 'assistant', text: '', images: [{ attachment: ref }] });
   assert.equal(projected.entries[2].images.length, 4); assert.match(projected.entries[2].text, /图片未载入/);
@@ -128,7 +127,6 @@ await check('tool-result images survive native and legacy wrappers with finite t
     { type: 'tool/result', data: { message: { toolCallId: 'large', content: [...Array.from({ length: 513 }, () => ({ type: 'text', text: '' })), { type: 'image', attachment: ref }] } } },
   ];
   const result = doorTranscript(events);
-  assert.deepEqual(result, extensionHistory.sessionTranscript(events));
   assert.equal(result.entries.length, 4); assert.deepEqual(result.entries[0].images, [{ attachment: ref }]); assert.deepEqual(result.entries[1].images, [{ attachment: ref }]);
   assert.match(result.entries[2].output, /图片未载入/); assert.match(result.entries[3].output, /图片未载入/);
   const unavailable = projectHistoryImages(result, {});

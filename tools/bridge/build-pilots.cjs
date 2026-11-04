@@ -71,10 +71,8 @@ function build({ home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh'),
       execFileSync(process.execPath, ['--check', path.join(target, 'lib', name)], { windowsHide: true, timeout: 10000, stdio: 'pipe' });
     }
     manifest.version = pilot.candidate;
-    for (const version of ['0.2.1-alpha.1', '0.2.1-rc.2', '0.2.1-rc.3']) {
-      for (const [name, range] of Object.entries(manifest.peerDependencies || {})) if (name.startsWith('@deepseek-ai/dsh') && !range.includes(version)) manifest.peerDependencies[name] = range + ' || ' + version;
-      if (manifest.dsh?.engines?.dsh && !manifest.dsh.engines.dsh.includes(version)) manifest.dsh.engines.dsh += ' || ' + version;
-    }
+    for (const name of Object.keys(manifest.peerDependencies || {})) if (name.startsWith('@deepseek-ai/dsh')) manifest.peerDependencies[name] = '0.2.1-rc.5';
+    if (manifest.dsh?.engines?.dsh) manifest.dsh.engines.dsh = '0.2.1-rc.5';
     manifest.dependencies = { ...manifest.dependencies, 'dsh-ide-bridge-sdk': JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/dsh-bridge-sdk/package.json'))).version };
     manifest.dshIdeBridge = { upstreamVersion: pilot.version, upstreamEntrySha256: hash, protocolVersion: 1,
       modificationNotice: 'Modified by DSH in VS Code to register IDE Bridge capabilities and declare the SDK dependency.' };
