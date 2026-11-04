@@ -2350,19 +2350,27 @@ async function readImageScene(url, profile, platformArgs) {
     socket = new WebSocket(target.webSocketDebuggerUrl);
     await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
     const text = await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('等待图片场景断言超时')), Math.max(1, deadline - Date.now()));
+      let retry;
+      const timer = setTimeout(() => { clearTimeout(retry); reject(new Error('等待图片场景断言超时')); }, Math.max(1, deadline - Date.now()));
+      let requestId = 0;
+      const evaluate = () => socket.send(JSON.stringify({ id: ++requestId, method: 'Runtime.evaluate', params: {
+        expression: `new Promise(resolve => { const poll = () => { const result = document.querySelector('#__results, #__pageerror'); if (result) resolve(JSON.stringify({ id: result.id, text: result.textContent })); else setTimeout(poll, 50); }; poll(); })`,
+        awaitPromise: true, returnByValue: true,
+      } }));
       socket.onmessage = ({ data }) => {
         const message = JSON.parse(data);
-        if (message.id !== 1) return;
+        if (message.id !== requestId) return;
+        // A target can appear just before its initial navigation replaces the context.
+        if (message.error && /Execution context was destroyed|Cannot find context|Inspected target navigated/i.test(message.error.message || '')) {
+          retry = setTimeout(evaluate, 100);
+          return;
+        }
         clearTimeout(timer);
         if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message.error || message.result.exceptionDetails)));
         else resolve(message.result.result.value);
       };
-      socket.onerror = () => { clearTimeout(timer); reject(new Error('Chrome 调试连接失败')); };
-      socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: {
-        expression: `new Promise(resolve => { const poll = () => { const result = document.querySelector('#__results, #__pageerror'); if (result) resolve(JSON.stringify({ id: result.id, text: result.textContent })); else setTimeout(poll, 50); }; poll(); })`,
-        awaitPromise: true, returnByValue: true,
-      } }));
+      socket.onerror = () => { clearTimeout(timer); clearTimeout(retry); reject(new Error('Chrome 调试连接失败')); };
+      evaluate();
     });
     const result = JSON.parse(text);
     if (result.id === '__pageerror') return { error: `页面错误：${result.text}` };
