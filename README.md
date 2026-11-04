@@ -7,17 +7,15 @@
 本仓库由两个组成部分构成，两者都需要安装。
 
 
-升级版为面板 `0.19.0`、接入点 `0.7.0`：“工具”视图提供代码审查和技能浏览，更多菜单提供文件技能管理；运行记录支持恢复、重试、清理及将报告显式带入对话。可选原生 `@dsh` Chat 与完整会话 API 集成在同一个主扩展中，继续保持一个活动栏入口。
+升级版为面板 `0.19.1`、接入点 `0.7.1`：“工具”视图提供代码审查和技能浏览，更多菜单提供文件技能管理；运行记录支持恢复、重试、清理及将报告显式带入对话。可选原生 `@dsh` Chat 与完整会话 API 集成在同一个主扩展中，继续保持一个活动栏入口。
 面板输入框支持文件、选区、技能、Git 变更、问题诊断和内置命令；运行中可排队下一条消息，失败或停止后暂停队列。每轮回答附有改动与测试结果卡，当前窗口保留最近十轮差异，可查看旧轮差异、撤销最新轮的文件改动，并核对工作区测试结果是否已过期。
-面板还支持图片选择、粘贴、拖入和发送前预览，显示图片与 GIF，并兼容 `dsh-meme` 图库。普通图片输入依赖当前会话模型和内核声明的图片能力；当前原生适配范围为 DSH `0.2.1-rc.3`，具体格式、大小和历史读取边界见[面板说明](packages/vscode-extension/README.md)。
-原生 Chat 支持显式文件和选区引用，包括未保存的编辑器内容；历史列表支持搜索、翻页、项目筛选和 Markdown 导出。审查发现可生成只读修复建议，经差异预览确认后逐项应用，并保存后重新审查。无工具修复生成要求 ACP `0.2.1-rc.2` 或 `0.2.1-rc.3` 的直接文本能力；能力缺失时提示手动修复，不启动普通工具会话。
+面板还支持图片选择、粘贴、拖入和发送前预览，显示图片与 GIF，并兼容 `dsh-meme` 图库。普通图片输入依赖当前会话模型和内核声明的图片能力；当前原生适配范围为 DSH `0.2.1-rc.5`，具体格式、大小和历史读取边界见[面板说明](packages/vscode-extension/README.md)。
+原生 Chat 支持显式文件和选区引用，包括未保存的编辑器内容；历史列表支持搜索、翻页、项目筛选和 Markdown 导出。审查发现可生成只读修复建议，经差异预览确认后逐项应用，并保存后重新审查。无工具修复生成要求 ACP `0.2.1-rc.5` 的直接文本能力；能力缺失时提示手动修复，不启动普通工具会话。
 完整审查报告保存到本地，离线和重开窗口后可阅读。实际应用的修复、修复前测试、每次重测和后续审查保留关联记录；测试直接依据选中的审查工作区，无需聊天轮次。
 两个试点插件需要安装带 Bridge 注册补丁的适配包，发行附件保留原作者来源；市场中的原版插件继续保留原有入口。见下文安装方法。
 提供方 SDK `0.1.1` 包含类型、注册与校验助手、模拟宿主和独立示例，见 [SDK 文档](packages/dsh-bridge-sdk/README.md)。
 
-当前维护版本覆盖 DSH `0.1.5-rc.2`、`0.2.0-rc.1`、`0.2.0-rc.2` 与预览版 `0.2.1-alpha.1`、`0.2.1-rc.2`、`0.2.1-rc.3`；rc.3 已进入候选必测组合，验收状态见
-[`compat/versions.json`](compat/versions.json)。DSH 0.2 使用 v4 会话格式和
-新的权限目录接口；兼容差异由接入点插件内部处理，VS Code 面板协议不变。
+当前仅维护 DSH `0.2.1-rc.5`（npm 与 Desktop 发行方式）。历史使用内核公开 `sessionQuery`，权限使用 catalog 接口；不再提供更早内核的适配和本地 v3 文件读取。当前候选的验收状态见 [`compat/versions.json`](compat/versions.json)。
 
 | 包 | 内容 | 安装位置 |
 | --- | --- | --- |
@@ -31,7 +29,6 @@
 - `tools/`：构建、验证与兼容维护工具。
 - `docs/`：正式接口与维护文档。
 - `compat/`：兼容范围和对应的公开验证结果。
-- `spike/`：ACP 协议探测工具。
 - `build/`：生成的安装包和临时验证产物，不纳入 Git。
 - `.local/`：本地工作资料和备份，不纳入 Git。
 
@@ -172,7 +169,7 @@ node packages/vscode-extension/tools/publish.js --candidate <候选.vsix> # 检�
 node packages/dsh-door/test/frames.js       # 帧判定
 node packages/dsh-door/test/permission.js   # 权限预设方法
 node packages/dsh-door/test/port.js         # 端口判定
-node packages/dsh-door/test/sessions.js     # 会话读取
+node packages/dsh-door/test/history-events.js # 历史事件投影
 node packages/dsh-door/tools/publish.cjs --candidate <候选接入点.tgz> # 检查已有候选，不上传
 ```
 
@@ -194,8 +191,8 @@ node packages/dsh-door/tools/publish.cjs --candidate <候选接入点.tgz> # 检
 ```sh
 pnpm compat:doctor -- --json
 pnpm compat:contracts
-pnpm compat:test -- --dsh 0.2.0-rc.2 --tgz <候选接入点.tgz>
-pnpm compat:test -- --dsh 0.2.0-rc.2 --install --tgz <候选接入点.tgz>
+pnpm compat:test -- --dsh 0.2.1-rc.5 --tgz <候选接入点.tgz>
+pnpm compat:test -- --dsh 0.2.1-rc.5 --install --tgz <候选接入点.tgz>
 pnpm compat:release-check -- --evidence <验收证据清单.json>
 ```
 
@@ -207,7 +204,6 @@ pnpm compat:release-check -- --evidence <验收证据清单.json>
 
 - `docs/` —— 项目接口、维护和发布文档。
 - [`docs/注释与文档规范.md`](docs/注释与文档规范.md) —— 文档与注释规范。
-- `spike/` —— 早期用于确认 ACP 协议行为的探测脚本。
 - `packages/*/test`、`packages/*/tools` —— 测试与诊断工具，均不进入发布包。
 
 ## 许可

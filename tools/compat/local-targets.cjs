@@ -30,16 +30,18 @@ function verifyInstallation({ home, extension, candidates }) {
     require('../bridge/packages.cjs').verifyCandidate(value.file, kind);
   }
   const hashes = [];
+  const runtimeDependencies = {};
   const packages = require('../bridge/packages.cjs');
   for (const profile of ['desktop', 'vscode-panel']) {
     const directory = path.join(home, 'profiles', profile);
     assert(json(path.join(directory, 'package.json')).dsh.profile.bundles.includes('dsh-acp-door'));
-    packages.verifyInstalledCandidate(candidates.tgz, path.join(directory, 'node_modules/dsh-acp-door'), { root: home });
+    const installed = packages.verifyInstalledCandidate(candidates.tgz, path.join(directory, 'node_modules/dsh-acp-door'), { root: home });
+    runtimeDependencies[profile] = installed.runtimeDependencies;
     for (const [file, hash] of Object.entries(candidates.tgz.files)) hashes.push({ profile, file, sha256: hash });
   }
   packages.verifyInstalledCandidate(candidates.vsix, extension);
   return { doorFilesPerProfile: Object.keys(candidates.tgz.files).length, files: hashes, panel: { verified: true },
-    targets: { home: path.resolve(home), extension: path.resolve(extension) },
+    targets: { home: path.resolve(home), extension: path.resolve(extension) }, runtimeDependencies,
     artifacts: ['tgz', 'vsix'].map(kind => ({ kind, sha256: candidates[kind].sha256 })) };
 }
 

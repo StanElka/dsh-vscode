@@ -1,7 +1,6 @@
 'use strict';
-/** 新内核通过 activation 返回子会话；旧内核直接返回本地 Agent。 */
+/** DSH rc.3 starts a child session through activation. */
 async function startReviewSubagent(ctx, request) {
-  if (typeof ctx.subagents.start === 'function') return ctx.subagents.start('spawn', request);
   if (typeof ctx.subagents.startActivation !== 'function') throw new Error('内核未提供受支持的子 Agent 启动接口');
   const { label, signal, persona, ...input } = request;
   const run = await ctx.subagents.startActivation({ provider: 'spawn', label, request: input, signal, delivery: 'caller' });
@@ -16,8 +15,8 @@ async function startReviewSubagent(ctx, request) {
 function patchReviewRuntime(original) {
   const replacements = [
     ["ctx.subagents.start('spawn', {", 'startReviewSubagent(ctx, {'],
-    ['!provider.capabilities.persona', '!(provider.capabilities.persona || provider.capabilities.agentPreset)'],
-    ['signal: combined, persona: REVIEW_PROMPT,', 'signal: combined, ...(provider.capabilities.persona ? { persona: REVIEW_PROMPT } : {}),'],
+    ['!provider.capabilities.persona', '!provider.capabilities.agentPreset'],
+    ['signal: combined, persona: REVIEW_PROMPT,', 'signal: combined,'],
     ['configureReviewer(agent, locale = readHostLocale(agent.ctx))', 'configureReviewer(agent, locale = readHostLocale(agent.ctx), structured = false)'],
     ['text: outputLanguage(locale)', 'text: structured ? `Return only the JSON object required by the review rubric. Write title, body, and overall_explanation in ${locale === "en" ? "English" : "Simplified Chinese"}. Use absolute_file_path and the shortest valid line_range for every finding. Do not add prose or markdown fences.` : outputLanguage(locale)'],
     ['locale = readHostLocale(ctx))', 'locale = readHostLocale(ctx), structured = false, budget)'],

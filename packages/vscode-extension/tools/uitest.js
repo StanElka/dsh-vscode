@@ -18,7 +18,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { SCENARIOS, buildHtml, buildReplayScript, OUT, ROOT } = require('./preview');
 const { findChrome, missingChromeMessage } = require('./chrome.cjs');
@@ -326,6 +326,16 @@ function assertionsScript(scene) {
     if (EXPECT.imagesScene) {
       var receiveImageUi = function (message) { window.dispatchEvent(new MessageEvent('message', { data: message })); };
       var settleImageUi = function () { return new Promise(function (resolve) { setTimeout(resolve, 160); }); };
+      var observeImageReadUi = function () {
+        var original = FileReader.prototype.readAsDataURL;
+        return new Promise(function (resolve) {
+          FileReader.prototype.readAsDataURL = function () {
+            FileReader.prototype.readAsDataURL = original;
+            this.addEventListener('loadend', resolve, { once: true });
+            return original.apply(this, arguments);
+          };
+        });
+      };
       var waitImageRequestUi = async function (previous) {
         for (var attempt = 0; attempt < 100; attempt++) {
           var request = window.__received.filter(function (m) { return m.type === 'imageAdd' && (!previous || m.requestId !== previous.requestId); }).pop();
@@ -376,7 +386,9 @@ function assertionsScript(scene) {
       var gifBytesImageUi = Uint8Array.from(atob(gifImageUi), function (character) { return character.charCodeAt(0); });
       var gifFileImageUi = new File([gifBytesImageUi], 'animation.gif', { type: 'image/gif' });
       var pasteDataImageUi = new DataTransfer(); pasteDataImageUi.items.add(gifFileImageUi);
+      var pasteReadImageUi = observeImageReadUi();
       draftImageUi.dispatchEvent(new ClipboardEvent('paste', { clipboardData: pasteDataImageUi, bubbles: true, cancelable: true }));
+      await pasteReadImageUi;
       var pasteRequestImageUi = await waitImageRequestUi();
       assert('粘贴GIF保留原始字节与格式', !!pasteRequestImageUi && pasteRequestImageUi.mimeType === 'image/gif' && pasteRequestImageUi.data === gifImageUi && draftImageUi.value === '已有问题', JSON.stringify({ request: pasteRequestImageUi, hint: document.getElementById('hint').textContent, files: pasteDataImageUi.files.length }));
       var gifHashImageUi = 'b'.repeat(64);
@@ -386,7 +398,9 @@ function assertionsScript(scene) {
       assert('粘贴图片保存的仍是引用', window.__draftState.attachments.length === 1 && window.__draftState.attachments[0].mimeType === 'image/gif' && JSON.stringify(window.__draftState).indexOf(gifImageUi) < 0);
       document.querySelector('#attachments .chip-close').click();
       var dropDataImageUi = new DataTransfer(); dropDataImageUi.items.add(gifFileImageUi);
+      var dropReadImageUi = observeImageReadUi();
       document.querySelector('.composer').dispatchEvent(new DragEvent('drop', { dataTransfer: dropDataImageUi, bubbles: true, cancelable: true }));
+      await dropReadImageUi;
       var dropRequestImageUi = await waitImageRequestUi(pasteRequestImageUi);
       assert('拖入图片进入相同的验证流程', !!dropRequestImageUi && dropRequestImageUi.requestId !== pasteRequestImageUi.requestId && dropRequestImageUi.data === gifImageUi);
       receiveImageUi({ type: 'imageAdded', requestId: dropRequestImageUi && dropRequestImageUi.requestId, cwd: scopeImageUi.cwd, sessionId: scopeImageUi.sessionId, items: [gifItemImageUi], previews: [{ id: gifItemImageUi.id, dataUrl: 'data:image/gif;base64,' + gifImageUi }] });
@@ -744,8 +758,8 @@ function assertionsScript(scene) {
       historyButtonLife.click();
       receiveLife({ type: 'history', via: 'cache', cachedAt: Date.now(), limitation: '连接不可用', sessions: [] });
       assert('离线缓存展示摘要时间与连接限制', document.getElementById('history-meta').textContent.indexOf('摘要缓存') >= 0 && document.getElementById('history-meta').title.indexOf('缓存时间：') >= 0 && document.getElementById('history-meta').title.indexOf('连接不可用') >= 0);
-      receiveLife({ type: 'history', unsupported: 2, emptyReason: 'unsupported-format', sessions: [] });
-      assert('新版本地历史限制不会显示数据为空', document.getElementById('history-list').textContent.indexOf('连接内核') >= 0 && document.getElementById('history-list').textContent.indexOf('暂无历史') < 0);
+      receiveLife({ type: 'history', error: '请连接 DSH 后读取历史；离线时仅可查看已缓存的列表摘要。' });
+      assert('连接缺失不会显示历史数据为空', document.getElementById('history-list').textContent.indexOf('请连接 DSH') >= 0 && document.getElementById('history-list').textContent.indexOf('暂无历史') < 0);
       keyLife('Escape');
     }
     if (EXPECT.perf) {
@@ -1109,9 +1123,22 @@ function assertionsScript(scene) {
       assert('点击下一页才请求后续 30 条',nextRequest.offset===30 && nextRequest.limit===30);
       window.postMessage({type:'history',requestId:nextRequest.requestId,total:205,offset:30,nextOffset:60,sessions:[{id:'paged-next',title:'Next page'}]},'*');
       await new Promise(function(resolve){setTimeout(resolve,30);});
-      assert('分页统计及上一页可用',!document.getElementById('history-prev').disabled&&document.getElementById('history-page').textContent.indexOf('31')===0);
+      assert('分页页码和会话总数明确，上一页可用',!document.getElementById('history-prev').disabled&&document.getElementById('history-page').textContent==='第 2 / 7 页\\n共 205 段会话');
       document.getElementById('history-prev').click();
       assert('上一页回到前一页',window.__received.filter(function(message){return message.type==='historyList';}).pop().offset===0);
+
+      var firstRequestAfterPrev=window.__received.filter(function(message){return message.type==='historyList';}).pop();
+      window.postMessage({type:'history',requestId:firstRequestAfterPrev.requestId,total:205,offset:0,nextOffset:30,sessions:[{id:'paged',title:'Current page'}]},'*');
+      await new Promise(function(resolve){setTimeout(resolve,30);});
+      document.getElementById('history-next').click();
+      var historyRequestIdForEmpty=window.__received.filter(function(message){return message.type==='historyList';}).pop().requestId;
+      window.postMessage({type:'history',requestId:historyRequestIdForEmpty,total:0,offset:30,sessions:[]},'*');
+      await new Promise(function(resolve){setTimeout(resolve,30);});
+      var emptyRequest=window.__received.filter(function(message){return message.type==='historyList';}).pop();
+      assert('历史被清空后自动回到第一页',emptyRequest.requestId!==historyRequestIdForEmpty&&emptyRequest.offset===0&&emptyRequest.refresh===true);
+      window.postMessage({type:'history',requestId:emptyRequest.requestId,total:0,offset:0,sessions:[]},'*');
+      await new Promise(function(resolve){setTimeout(resolve,30);});
+      assert('空历史禁用翻页且不循环刷新',document.getElementById('history-prev').disabled&&document.getElementById('history-next').disabled&&window.__received.filter(function(message){return message.type==='historyList';}).pop().requestId===emptyRequest.requestId);
 
       search.value = ''; project.checked = false;
       var groupedCards = [
@@ -2298,7 +2325,64 @@ function assertionsScript(scene) {
 </script>`;
 }
 
-function runChrome(scene, profile) {
+// FileReader completes on real I/O, which Chrome's virtual-time budget does not wait for.
+// Observe the image scene in real time instead of letting --dump-dom finish early.
+async function readImageScene(url, profile, platformArgs) {
+  const portFile = path.join(profile, 'DevToolsActivePort');
+  fs.rmSync(portFile, { force: true });
+  const child = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+    ...platformArgs, '--force-device-scale-factor=1', '--window-size=420,900', '--remote-debugging-port=0', `--user-data-dir=${profile}`, url],
+  { stdio: 'ignore', windowsHide: true });
+  let socket;
+  try {
+    const deadline = Date.now() + CHROME_TIMEOUT_MS;
+    let target;
+    while (Date.now() < deadline && !target) {
+      if (child.exitCode !== null) throw new Error('Chrome 在界面验收前退出');
+      try {
+        const port = fs.readFileSync(portFile, 'utf8').split('\n')[0];
+        const response = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(2000) });
+        target = (await response.json()).find(item => item.type === 'page' && item.url === url);
+      } catch { /* Chrome may still be starting. */ }
+      if (!target) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!target) throw new Error('等待 Chrome 页面超时');
+    socket = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+    const text = await new Promise((resolve, reject) => {
+      let retry;
+      const timer = setTimeout(() => { clearTimeout(retry); reject(new Error('等待图片场景断言超时')); }, Math.max(1, deadline - Date.now()));
+      let requestId = 0;
+      const evaluate = () => socket.send(JSON.stringify({ id: ++requestId, method: 'Runtime.evaluate', params: {
+        expression: `new Promise(resolve => { const poll = () => { const result = document.querySelector('#__results, #__pageerror'); if (result) resolve(JSON.stringify({ id: result.id, text: result.textContent })); else setTimeout(poll, 50); }; poll(); })`,
+        awaitPromise: true, returnByValue: true,
+      } }));
+      socket.onmessage = ({ data }) => {
+        const message = JSON.parse(data);
+        if (message.id !== requestId) return;
+        // A target can appear just before its initial navigation replaces the context.
+        if (message.error && /Execution context was destroyed|Cannot find context|Inspected target navigated/i.test(message.error.message || '')) {
+          retry = setTimeout(evaluate, 100);
+          return;
+        }
+        clearTimeout(timer);
+        if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message.error || message.result.exceptionDetails)));
+        else resolve(message.result.result.value);
+      };
+      socket.onerror = () => { clearTimeout(timer); clearTimeout(retry); reject(new Error('Chrome 调试连接失败')); };
+      evaluate();
+    });
+    const result = JSON.parse(text);
+    if (result.id === '__pageerror') return { error: `页面错误：${result.text}` };
+    return { results: JSON.parse(result.text).results };
+  } finally {
+    socket?.close();
+    if (child.exitCode === null) child.kill();
+    if (child.exitCode === null) await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 3000))]);
+  }
+}
+
+async function runChrome(scene, profile) {
   const html = buildHtml('dark');
   const steps = TEST_SCENARIOS[scene]().steps;
   // 错误捕获器需置于**最前面**：此后任何一段内联脚本（包括断言脚本）
@@ -2318,6 +2402,7 @@ function runChrome(scene, profile) {
   const dom = path.join(WORK, `${scene}.dom.html`);
   const url = pathToFileURL(page).href;
   const platformArgs = process.platform === 'darwin' ? ['--use-mock-keychain', '--password-store=basic'] : [];
+  if (scene === 'images') return readImageScene(url, profile, platformArgs);
   fs.writeFileSync(dom, execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
     ...platformArgs, '--force-device-scale-factor=1', '--window-size=420,900', '--virtual-time-budget=9000', `--user-data-dir=${profile}`, '--dump-dom', url],
   { maxBuffer: 16 * 1024 * 1024, timeout: CHROME_TIMEOUT_MS, killSignal: 'SIGKILL', windowsHide: true }));
@@ -2337,7 +2422,7 @@ function runChrome(scene, profile) {
   return { results: JSON.parse(match[1]).results };
 }
 
-function main() {
+async function main() {
   if (!CHROME) {
     console.log(missingChromeMessage());
     process.exit(2);
@@ -2362,7 +2447,7 @@ function main() {
     console.log(`\n── 场景：${scene} ${'─'.repeat(Math.max(0, 40 - scene.length))}`);
     let outcome;
     try {
-      outcome = runChrome(scene, profile);
+      outcome = await runChrome(scene, profile);
     } catch (error) {
       outcome = { error: error.message, fatal: error.code === 'ETIMEDOUT' };
     }
@@ -2397,5 +2482,5 @@ function main() {
   }
 }
 
-if (require.main === module) main();
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { assertionsScript, TEST_SCENARIOS, EXPECTATIONS };

@@ -1561,7 +1561,8 @@ body.vscode-high-contrast-light .access-btn {
 .history-filters select:focus-visible, .history-filters button:focus-visible { outline: 1px solid var(--vscode-focusBorder); }
 .history-filters button:disabled, .history-item-actions button:disabled { opacity: .5; cursor: default; }
 .history-filters label { font-size: 12px; white-space: nowrap; }
-.history-pages { justify-content: space-between; }
+.history-pages { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+#history-page { min-width: 0; text-align: center; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.4; }
 .history-pages button { color: var(--vscode-button-secondaryForeground); background: var(--vscode-button-secondaryBackground); border: 1px solid var(--vscode-contrastBorder, transparent); padding: 4px 8px; cursor: pointer; }
 .history-pages button:disabled { opacity: .5; cursor: default; }
 .history-pages button:focus-visible, .history-filters input:focus-visible { outline: 1px solid var(--vscode-focusBorder); }

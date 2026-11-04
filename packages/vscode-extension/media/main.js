@@ -1158,22 +1158,26 @@
     const sessions = Array.isArray(message.sessions) ? message.sessions : [];
     historyArchiveSupported = message.archiveSupported === true;
     el.historyArchive.disabled = message.archiveStateKnown === false;
-    if (!sessions.length && message.total > 0 && message.offset >= message.total) {
-      requestHistory(Math.floor((message.total - 1) / HISTORY_PAGE_SIZE) * HISTORY_PAGE_SIZE, true);
+    if (!sessions.length && Number.isInteger(message.total) && message.total >= 0 && message.offset > 0 && message.offset >= message.total) {
+      requestHistory(Math.max(0, Math.floor((message.total - 1) / HISTORY_PAGE_SIZE)) * HISTORY_PAGE_SIZE, true);
       return;
     }
     historyOffset = message.offset || 0; historyNextOffset = message.nextOffset;
     el.historyPrev.disabled = historyOffset === 0;
     el.historyNext.disabled = !Number.isInteger(historyNextOffset);
-    el.historyPage.textContent = sessions.length ? `${historyOffset + 1}–${historyOffset + sessions.length}${Number.isInteger(message.total) ? ' / ' + message.total : ''}` : '';
-    if (message.queryUnsupported) {
-      el.historyMeta.textContent = '当前接入点需更新才能搜索和翻页';
-    } else if (Number.isInteger(message.total)) {
-      el.historyMeta.textContent = `共 ${message.total} 段`;
+    const page = Math.floor(historyOffset / HISTORY_PAGE_SIZE) + 1;
+    const totalKnown = Number.isInteger(message.total) && message.total >= 0;
+    const pageLabel = totalKnown ? `第 ${page} / ${Math.max(1, Math.ceil(message.total / HISTORY_PAGE_SIZE))} 页` : `第 ${page} 页`;
+    const countLabel = totalKnown ? `共 ${message.total} 段会话` : `本页 ${sessions.length} 段会话`;
+    el.historyPage.textContent = sessions.length
+      ? `${pageLabel}\n${countLabel}`
+      : totalKnown ? countLabel : '';
+    if (Number.isInteger(message.total)) {
+      el.historyMeta.textContent = `共 ${message.total} 段会话`;
     } else if (message.skipped > 0) {
       el.historyMeta.textContent = `最近 ${sessions.length} 段（更早的 ${message.skipped} 段未列出）`;
     } else {
-      el.historyMeta.textContent = sessions.length ? `共 ${sessions.length} 段` : '';
+      el.historyMeta.textContent = sessions.length ? `共 ${sessions.length} 段会话` : '';
     }
     const limitations = [];
     if (el.historyArchive.value === 'unlisted') limitations.push('未登记到 DSH 工作区；接回后同步');
@@ -1187,7 +1191,7 @@
     if (sessions.length === 0) {
       const box = document.createElement('div');
       box.className = 'history-empty';
-      box.textContent = message.emptyReason === 'unsupported-format' || message.unsupported > 0 ? '本地降级无法读取新版会话；连接内核后可查看历史。' : '暂无历史会话。';
+      box.textContent = '暂无历史会话。';
       el.historyList.appendChild(box);
       if (samePage && focused) el.historyClose.focus({ preventScroll: true });
       return;

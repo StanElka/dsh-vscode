@@ -393,6 +393,28 @@ function fixture() {
   cancelledRestore.panel.readHistory = async () => ({ result: { entries: [] }, via: 'door' }); cancelledRestore.session.resume = async () => { throw new Error('failed'); };
   await cancelledRestore.panel.resumeHistory('failed'); assert.equal(resets, 0);
 
+  const foreignHistory = fixture(); let foreignResumes = 0;
+  foreignHistory.panel.readHistory = async () => ({ result: { card: { id: 'foreign', cwd: OUTSIDE }, entries: [] }, via: 'door' });
+  foreignHistory.session.resume = async () => { foreignResumes++; };
+  await foreignHistory.panel.resumeHistory('foreign');
+  assert.equal(foreignResumes, 0, 'History from another directory must not resume under the current project');
+  assert.equal(foreignHistory.session.sessionId, 'original');
+  assert.equal(foreignHistory.panel.historyReadonly, true);
+  assert(foreignHistory.output.some(item => item.historical && /工作目录/.test(item.text)));
+
+  const sameHistory = fixture(); let sameCwd;
+  sameHistory.panel.readHistory = async () => ({ result: { card: { id: 'same', cwd: path.join(PROJECT, '.') + path.sep }, entries: [] }, via: 'door' });
+  sameHistory.session.resume = async (id, cwd) => { sameHistory.session.sessionId = id; sameCwd = cwd; };
+  await sameHistory.panel.resumeHistory('same');
+  assert.equal(sameCwd, PROJECT, 'Equivalent directory spellings may resume');
+  assert.equal(sameHistory.panel.historyReadonly, false);
+
+  const explicitHistory = fixture(); let explicitCwd;
+  explicitHistory.panel.readHistory = async () => ({ result: { card: { id: 'explicit-dir', cwd: OUTSIDE }, entries: [] }, via: 'door' });
+  explicitHistory.session.resume = async (id, cwd) => { explicitHistory.session.sessionId = id; explicitCwd = cwd; };
+  await explicitHistory.panel.resumeHistory('explicit-dir', { cwd: OUTSIDE });
+  assert.equal(explicitCwd, OUTSIDE, 'An explicit trusted target matching the history is respected');
+
   for (const navigation of ['other-history', 'current']) {
     const navigating = fixture(), resumeGate = deferred();
     navigating.panel.post({ type: 'user', text: 'original conversation' });

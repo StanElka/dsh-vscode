@@ -18,7 +18,7 @@ export function isDoorStatusRequest(frame) {
 export function doorStatusPayload({
   model,
   textGeneration,
-  historyKind = 'legacy-v3-disk',
+  historyKind = 'unavailable',
   historyArchive = false,
   permissionKind,
   acpVersion,
@@ -30,7 +30,7 @@ export function doorStatusPayload({
 } = {}) {
   const selection = model && model.selection;
   const normalizedHistory =
-    historyKind === 'session-query' ? 'session-query' : historyKind === 'unavailable' ? 'unavailable' : 'legacy-v3-disk';
+    historyKind === 'session-query' ? 'session-query' : 'unavailable';
   return {
     version: DOOR_VERSION,
     ...(instanceId ? { instanceId } : {}),
@@ -52,7 +52,7 @@ export function doorStatusPayload({
       historyQuery: normalizedHistory !== 'unavailable',
       historyKind: normalizedHistory,
       ...(historyArchive ? { historyArchive: true } : {}),
-      ...(normalizedHistory === 'unavailable' ? {} : { sessionFormat: normalizedHistory === 'session-query' ? 4 : 3 }),
+      ...(normalizedHistory === 'session-query' ? { sessionFormat: 4 } : {}),
       permissionPresets: Boolean(permissionKind),
       ...(permissionKind ? { permissionKind } : {}),
     },

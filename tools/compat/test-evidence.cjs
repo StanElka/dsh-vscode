@@ -165,6 +165,12 @@ try {
   const matrix = { platform: 'win32', versions: [...kernels.map(item => ({ dsh: item.runtime.version, distribution: item.runtime.distribution, panel: '0.9.0', door: '0.9.0', evidence: ['absent-historical.json'] })), { dsh: '1.0.0', distribution: 'npm', panel: current.panel, door: current.door, sdk: current.sdk }], currentRelease: { status: 'pending', evidence: [] } };
   const editors = { minimum: '1.90.2', chatBaseline: '1.91.1', evidence: 'absent-historical-editor.json', supported: [{ editor: '1.91.1' }, { editor: '1.142.0' }], currentRelease: { status: 'pending', evidence: [] } };
   const context = { matrix, editors, current, state, platform: 'win32' };
+  const historicalKernel = write('historical-kernel.json', kernels[0]);
+  const historicalEditor = write('historical-editor.json', fixture.editorReports[0]);
+  const historicalContext = { matrix: { versions: [], historical: [{ evidence: [historicalKernel] }] }, editors: { historical: [{ evidence: historicalEditor }] } };
+  assert.equal(releaseCheck({ historical: true }, historicalContext).status, 'passed');
+  assert.equal(releaseCheck({ historical: true }, { ...historicalContext, matrix: { versions: [], historical: [{ evidence: ['missing-historical.json'] }] } }).status, 'failed');
+  assert.equal(releaseCheck({ historical: true }, { ...historicalContext, editors: { historical: [{ evidence: 'missing-historical-editor.json' }] } }).status, 'failed');
   assert.equal(releaseRequirements(matrix, editors).combinations.length, 2, '产品版本历史不能重复增加必测组合');
   const rawEditor = { ...base, artifacts: [fixture.artifacts[1]], stages: [{ name: 'packed-vsix-native-editor', status: 'passed', result: { vscode: '1.90.2', diagnosticLaunchFlags: [], checks: requiredChecks('1.90.2'), vsixSha256: fixture.artifacts[1].sha256 } }] };
   assert.equal(editorEvidence(rawEditor, state, current, { vsix: fixture.artifacts[1].file, platform: 'win32' }).editor, '1.90.2');

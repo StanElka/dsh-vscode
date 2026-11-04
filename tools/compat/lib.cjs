@@ -182,13 +182,14 @@ function supportedMatrix(matrix = json(path.join(ROOT, 'compat/versions.json')),
 }
 function discoveryResult(matrix, npm, releases, issues = []) {
   const supported = supportedMatrix(matrix), declared = new Set(matrix.versions.map(item => item.distribution + ':' + item.dsh));
+  const minimum = matrix.versions.map(item => item.dsh).filter(version => semver.valid(version)).sort(semver.compare)[0];
   const available = Object.keys(npm?.versions || {}).filter(version => semver.valid(version)).sort(semver.rcompare);
   const stable = available.find(version => !semver.prerelease(version)), prerelease = available.find(version => semver.prerelease(version));
   const upstream = (Array.isArray(releases) ? releases : []).filter(release => !release.draft).map(release => release.tag_name?.replace(/^dsh-v/, '')).filter(version => semver.valid(version)).sort(semver.rcompare)[0];
-  const npmVersions = [...new Set([stable, prerelease, available.includes(upstream) && upstream].filter(Boolean))].filter(version => !declared.has('npm:' + version));
+  const npmVersions = [...new Set([stable, prerelease, available.includes(upstream) && upstream].filter(Boolean))].filter(version => (!minimum || semver.gte(version, minimum)) && !declared.has('npm:' + version));
   return { ...supported, stable, prerelease, upstream, acquisitionIssues: issues,
     probes: { include: npmVersions.flatMap(dsh => ['windows-latest', 'ubuntu-latest'].map(os => ({ dsh, os, distribution: 'npm' }))) },
-    desktopProbes: upstream && !available.includes(upstream) && !declared.has('desktop:' + upstream) ? [{ dsh: upstream, distribution: 'desktop', status: 'manual-environment-required' }] : [] };
+    desktopProbes: upstream && (!minimum || semver.gte(upstream, minimum)) && !available.includes(upstream) && !declared.has('desktop:' + upstream) ? [{ dsh: upstream, distribution: 'desktop', status: 'manual-environment-required' }] : [] };
 }
 async function discover() {
   const matrix = json(path.join(ROOT, 'compat/versions.json'));

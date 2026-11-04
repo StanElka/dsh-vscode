@@ -14,7 +14,7 @@ const suites = [
   ['ACP SDK 流协议', 'acp-sdk.js'],
   ['MCP SDK 客户端协议', 'mcp-sdk.js'],
   ['帧解析与中继', 'frames.js'],
-  ['历史会话读取', 'sessions.js'],
+  ['历史事件投影', 'history-events.js'],
   ['端口与监听边界', 'port.js'],
   ['模型选择与状态', 'model-status.js'],
   ['权限预设旁路', 'permission.js'],

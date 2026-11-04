@@ -111,8 +111,13 @@ function archiveEntries(file, { platform = process.platform, run = execFileSync 
   return check.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
 }
 
+function iconAssetPath(manifest) {
+  return manifest.icon ? path.posix.join('extension', manifest.icon.replace(/\\/g, '/')) : '';
+}
+
 function manifestXml(manifest) {
   const categories = Array.isArray(manifest.categories) ? manifest.categories.join(',') : 'Other';
+  const icon = iconAssetPath(manifest);
   return `<?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
@@ -128,7 +133,7 @@ function manifestXml(manifest) {
       <Property Id="Microsoft.VisualStudio.Code.ExtensionPack" Value="" />
       <Property Id="Microsoft.VisualStudio.Code.ExtensionKind" Value="ui,workspace" />
       <Property Id="Microsoft.VisualStudio.Code.LocalizedLanguages" Value="" />
-    </Properties>
+    </Properties>${icon ? `\n    <Icon>${escapeXml(icon)}</Icon>` : ''}
   </Metadata>
   <Installation>
     <InstallationTarget Id="Microsoft.VisualStudio.Code" />
@@ -136,7 +141,7 @@ function manifestXml(manifest) {
   <Dependencies />
   <Assets>
     <Asset Type="Microsoft.VisualStudio.Code.Manifest" Path="extension/package.json" Addressable="true" />
-    <Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true" />
+    <Asset Type="Microsoft.VisualStudio.Services.Content.Details" Path="extension/README.md" Addressable="true" />${icon ? `\n    <Asset Type="Microsoft.VisualStudio.Services.Icons.Default" Path="${escapeXml(icon)}" Addressable="true" />` : ''}
   </Assets>
 </PackageManifest>
 `;
@@ -180,7 +185,9 @@ function main(args = process.argv.slice(2)) {
 
   const problems = [];
   if (entries.some((name) => name.includes('\\'))) problems.push('有条目名用了反斜杠（vsix 会装不上）');
-  for (const required of ['extension.vsixmanifest', '[Content_Types].xml', 'extension/package.json', 'extension/src/extension.js']) {
+  const requiredEntries = ['extension.vsixmanifest', '[Content_Types].xml', 'extension/package.json', 'extension/src/extension.js'];
+  if (manifest.icon) requiredEntries.push(iconAssetPath(manifest));
+  for (const required of requiredEntries) {
     if (!entries.includes(required)) problems.push(`缺少条目：${required}`);
   }
 

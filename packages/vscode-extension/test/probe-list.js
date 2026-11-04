@@ -4,7 +4,7 @@
  * 探查内核自身的 ACP `session/list` 实际返回内容。
  * 面板需要实现「历史会话列表」，因此必须确认其真实形状与取舍
  * （结论：该项仅包含 {sessionId, cwd}，没有标题与时间 —— 因此历史列表不由该接口提供，
- *  而由 ACP 接入点插件（dsh-acp-door）的旁路方法或面板自行读取磁盘提供，见 src/dsh/sessions.js）。
+ *  而由 ACP 接入点插件（dsh-acp-door）通过内核 sessionQuery 提供）。
  */
 
 const { DoorClient } = require('../src/door/client');

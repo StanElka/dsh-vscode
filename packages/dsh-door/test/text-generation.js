@@ -9,12 +9,12 @@ const llm = { async *stream(options) {
   yield { type: 'block-end', index: 0, block: { type: 'text', text: '{"edits":[]}' } };
   yield { type: 'finish', reason: { kind: 'stop' } };
 }, execute() { toolExecutions++; } };
-assert(textGenerationSupported(llm, '0.2.1-rc.2'));
-assert(textGenerationSupported(llm, '0.2.1-rc.3'));
-for (const version of ['0.2.1-rc.4', '0.2.1', undefined]) assert(!textGenerationSupported(llm, version));
+assert(!textGenerationSupported(llm, '0.2.1-rc.2'));
+assert(textGenerationSupported(llm, '0.2.1-rc.5'));
+for (const version of ['0.2.1-rc.6', '0.2.1', undefined]) assert(!textGenerationSupported(llm, version));
 assert(!textGenerationSupported(llm, '0.2.0-rc.2'));
 assert(!textGenerationSupported({}, '0.2.1-rc.2'));
-assert(!textGenerationSupported({}, '0.2.1-rc.3'));
+assert(!textGenerationSupported({}, '0.2.1-rc.5'));
 const options = { prompt: 'suggest a repair', provider: 'fixture', model: 'fixture', signal };
 assert.deepEqual(await generateTextOnly(llm, options), { text: '{"edits":[]}', path: 'llm-direct-v1', tools: false });
 for (const chunk of [{ type: 'tool-call-delta' }, { type: 'block-start', blockType: 'tool-call' }, { type: 'block-end', block: { type: 'tool-call' } }]) {

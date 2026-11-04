@@ -1,11 +1,11 @@
 /**
  * ACP 接入点选择新会话初始模型时使用的纯函数。
  *
- * DSH 0.1.5 起由 `agentDefaultModel.currentSelection()` 保存用户在 DSH 界面中
+ * 由 `agentDefaultModel.currentSelection()` 保存用户在 DSH 界面中
  * 实际选择的默认模型。接入点若继续把某一台开发机上的 provider/model 写死在
  * 安装包中，新用户即使已在 DSH 中选好模型，ACP 会话仍会走错误的服务商。
  *
- * 本模块不依赖 DSH 内核，便于用普通 Node 进程覆盖新旧版本兼容分支。
+ * 本模块不依赖 DSH 内核，便于用普通 Node 进程验证路由选择与缺失服务诊断。
  */
 
 /** 去掉空白并只接受完整的 provider/model 对。 */

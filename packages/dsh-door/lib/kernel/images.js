@@ -2,7 +2,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 export const IMAGE_CAPABILITIES_METHOD = 'dsh-door/images/capabilities';
 export const IMAGE_READ_METHOD = 'dsh-door/images/read';
-const NATIVE_IMAGE_RUNTIMES = new Set(['0.2.1-rc.3']);
+const NATIVE_IMAGE_RUNTIMES = new Set(['0.2.1-rc.5']);
 const MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const fail = (message, code) => { throw Object.assign(new Error(message), { code }); };
 

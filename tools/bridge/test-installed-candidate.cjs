@@ -11,6 +11,15 @@ try {
   const extraction = path.join(folder, 'lf'); fs.mkdirSync(extraction); extractPackageArchive(lf, extraction);
   const installed = path.join(extraction, 'package');
   assert.equal(verifyInstalledCandidate(artifact, installed).files, Object.keys(artifact.files).length);
+  const sdkFixture = path.join(installed, 'node_modules', '@agentclientprotocol', 'sdk');
+  const zodFixture = path.join(installed, 'node_modules', 'zod');
+  fs.mkdirSync(sdkFixture, { recursive: true }); fs.mkdirSync(zodFixture, { recursive: true });
+  fs.writeFileSync(path.join(sdkFixture, 'package.json'), JSON.stringify({ name: '@agentclientprotocol/sdk', version: '1.9.0' }));
+  fs.writeFileSync(path.join(zodFixture, 'package.json'), JSON.stringify({ name: 'zod', version: '4.6.7' }));
+  assert.equal(verifyInstalledCandidate(artifact, installed).runtimeDependencies.length, 2);
+  fs.writeFileSync(path.join(sdkFixture, 'package.json'), JSON.stringify({ name: '@agentclientprotocol/sdk', version: '0.1.0' }));
+  assert.throws(() => verifyInstalledCandidate(artifact, installed), /outside \^1\.9\.0/);
+  fs.rmSync(path.join(installed, 'node_modules'), { recursive: true, force: true });
   const file = path.join(installed, 'lib/status.js'), original = fs.readFileSync(file);
   fs.writeFileSync(file, original.toString().replace(/\r?\n/g, '\r\n'));
   assert.throws(() => verifyInstalledCandidate(artifact, installed), /content differs/);

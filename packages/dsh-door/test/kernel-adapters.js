@@ -1,11 +1,7 @@
 import assert from 'node:assert/strict';
 import { withAcpApprovalPriority } from '../lib/kernel/acp-context.js';
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
 
 import {
-  createLegacyHistory,
   createSessionQueryHistory,
   eventsWithSessionHeader,
   historyFromQueryRead,
@@ -162,16 +158,6 @@ await check('取消历史查询后不再启动下一批内核读取', async () =
   await assert.rejects(pending, { name: 'AbortError' }); assert.equal(reads, 4);
 });
 
-await check('旧版历史回退在首次启动的空目录上返回空列表', async () => {
-  const root = path.join(os.tmpdir(), `dsh-door-empty-${process.pid}-${Date.now()}`);
-  try {
-    const actual = await createLegacyHistory(root).list();
-    assert.deepEqual(actual, { sessions: [], skipped: 0, total: 0, offset: 0 });
-  } finally {
-    fs.rmSync(root, { recursive: true, force: true });
-  }
-});
-
 function makeContext(service) {
   return {
     permissionPresets: service,
@@ -179,11 +165,11 @@ function makeContext(service) {
   };
 }
 
-await check('权限接口版本能区分 DSH 0.2 catalog 与 DSH 0.1 selectFor', () => {
+await check('权限接口只接入当前 catalog；旧接口明确拒绝', () => {
   assert.equal(permissionApiKind({ catalog() {}, current() {}, set() {} }), 'catalog');
   assert.equal(
     permissionApiKind({ selectFor() {}, permissionState() {}, current() {}, set() {} }),
-    'select-for',
+    undefined,
   );
   assert.equal(permissionApiKind({ current() {} }), undefined);
 });
@@ -220,21 +206,6 @@ await check('DSH 0.2 catalog 权限接口可读、可切并使用 resolve 校验
     () => handler.set('s1', 'gone'),
     (error) => doorErrorCode(error) === DOOR_ERR_UNKNOWN_PRESET,
   );
-});
-
-await check('DSH 0.1 selectFor 权限接口继续受支持', async () => {
-  let current = 'read-only';
-  const handler = createPermissionHandler(makeContext({
-    defaultPreset: 'read-only',
-    permissionState(session) { return { session }; },
-    selectFor() {
-      return { options: [{ value: 'read-only' }, { value: 'danger-full-access' }] };
-    },
-    current() { return current; },
-    async set(_session, value) { current = value; },
-  }));
-  assert.equal(handler.kind, 'select-for');
-  assert.equal((await handler.set('s1', 'danger-full-access')).currentValue, 'danger-full-access');
 });
 
 await check('会话不存在与未知权限服务都明确失败', async () => {

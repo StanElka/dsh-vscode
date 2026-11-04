@@ -4,7 +4,7 @@ export const TEXT_GENERATE = 'dsh-door/text/generate';
 const fail = (message, code = -32042) => { throw Object.assign(new Error(message), { code }); };
 /** These runtime generations expose the same direct stream contract, without an agent tool dispatcher. */
 export function textGenerationSupported(llm, version) {
-  return ['0.2.1-rc.2', '0.2.1-rc.3'].includes(version) && typeof llm?.stream === 'function';
+  return version === '0.2.1-rc.5' && typeof llm?.stream === 'function';
 }
 /** Follow only successful ACP projections: Agent.options retains the initial route after a model switch. */
 export function rememberTextModelRequest(frame, state) {

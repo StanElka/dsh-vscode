@@ -4,17 +4,17 @@
 
 存在 DSH `workspaceRegistry` 时，历史列表默认仅包含工作区已登记或已置顶的未归档会话，`archived: true` 只读取已归档会话，`unlisted: true` 读取尚未登记的未归档持久记录；过滤先于分页与标题读取。新建和接回的 ACP 会话会登记到相应工作区。归档、恢复调用同一注册表的 `archiveSession`、`unarchiveSession`，不直接修改归档文件，也不隐式停止运行中的任务。归档与成员范围变更以 `dsh-door/history-changed` 通知所有已连接面板，通知只含列表版本，不含会话正文。缺少该服务时明确报告归档状态未知，并禁用写入。
 
-旧版 v3 历史异步读取并在内存中缓存摘要，最多保留 16384 条或 8 MiB；不缓存完整对话正文。文件身份、大小或修改时间变化后重新读取，删除的记录从缓存移除。客户端通过 `$/cancelRequest`（`id`）或 ACP 的 `$/cancel_request`（`requestId`）取消查询，连接断开也会停止等待结果；v3 会同时停止后续读取，v4 内部读取仍由内核公开 `sessionQuery` 管理。每个连接最多同时等待 8 个历史请求。
+历史通过当前内核的公开 `sessionQuery` 服务读取，不直接解析持久文件。客户端通过 `$/cancelRequest`（`id`）或 ACP 的 `$/cancel_request`（`requestId`）取消查询，连接断开也会停止等待结果；内核拥有实际持久读取。每个连接最多同时等待 8 个历史请求。
 
 需要已安装并运行的 DeepSeek Harness，以及支持 ACP 的外部客户端。接入点仅供本机使用；安装后需重启对应的 DSH 内核。
 
-`dsh-door/images/capabilities`（`{sessionId}`）检查当前连接所属会话的模型是否声明图片输入、原生附件服务是否可用，以及初始化连接时是否启用了图片。当前验证范围为 ACP `0.2.1-rc.3`，发送仍使用标准 ACP 图片内容块。模型切换后重新查询；原连接禁用图片时需要重连。相关工具清单来自当前 Agent 可见的注册名称，不能据此保证外部搜图或图片生成服务可用。
+`dsh-door/images/capabilities`（`{sessionId}`）检查当前连接所属会话的模型是否声明图片输入、原生附件服务是否可用，以及初始化连接时是否启用了图片。当前验证范围为 ACP `0.2.1-rc.5`，发送仍使用标准 ACP 图片内容块。模型切换后重新查询；原连接禁用图片时需要重连。相关工具清单来自当前 Agent 可见的注册名称，不能据此保证外部搜图或图片生成服务可用。
 
 成功读取历史后，图片以不含原生附件标识的临时引用返回。客户端通过 `dsh-door/images/read`（`{token}`）读取该连接已取得的图片引用；未知或其他连接的引用被拒绝。历史图片按格式、内容摘要和大小校验，并受并发、超时和取消限制。
 
 在同一内核启用 `dsh-meme` 和 Web 服务时，客户端可通过 `dsh-door/media/catalog`、`dsh-door/media/read` 读取表情图库及图片，两个方法均指定 `provider: "dsh-meme"`，图片读取另传图库返回的 `id`。状态中的 `capabilities.media` 表示适配接口可用；插件是否已启用以图库请求结果为准。适配器只访问该内核回环地址上的固定插件路由，不读取图库数据库，不执行图库管理操作；每项内容限制为 8 MiB，并校验图片类型及文件签名。当前按 `dsh-meme 0.1.52` 的公开路由格式验证。
 
-`0.2.0` 增加同一连接上的 IDE Bridge：插件主动注册能力、本机自动鉴权、可恢复运行与取消。
+IDE Bridge 提供同一连接上的能力调用：插件主动注册能力、本机自动鉴权、可恢复运行与取消。
 协议规范见仓库的 `docs/bridge-v1.md`。现有 ACP 会话、流式输出、历史和权限方法继续兼容。
 
 
@@ -50,7 +50,7 @@ dsh plugin --profile <your-profile> update dsh-acp-door
 
 Restart the kernel afterwards.
 
-Compatibility: DSH `0.1.5-rc.2`, `0.2.0-rc.1`, `0.2.0-rc.2`, and previews `0.2.1-alpha.1` / `0.2.1-rc.2` / `0.2.1-rc.3`. DSH `0.2.1-rc.2` requires dsh-acp-door `0.5.2` or later; `0.2.1-rc.3` requires `0.6.2` or later. Current candidate acceptance is recorded in the compatibility matrix.
+Compatibility: DSH `0.2.1-rc.5` only. Current candidate acceptance is recorded in the compatibility matrix.
 
 </details>
 
@@ -198,17 +198,7 @@ DSH Desktop（运行中）
 
 ### 预设恢复来源
 
-对于 v3 会话格式：
-
-- 桌面端建立的会话，第一行 header 中含 `"agentPreset":"standard"`；
-- 经该插件建立的会话，**不含** `agentPreset` —— 建立后读取即不存在，执行完一个回合后再读仍不存在。
-
-即内核仅在桌面端所使用的建会话方式下将预设写入记录。因此：
-
-1. 该插件无法从记录中获知原先挂载的预设 → 该插件在**内核进程内**保存一份
-   `sessionId → preset` 映射（跨连接共享），客户端也会在 `session/resume` 的
-   `_meta` 中指定所需预设，两个来源合并使用。
-2. 这也是上文缺陷的根源：不读取记录则无法自动还原，必须依靠 `mount` 补挂。
+接入点在内核进程内保存 `sessionId → preset` 映射，客户端也会在 `session/resume` 的 `_meta` 中指定所需预设。恢复时使用这些明确的预设信息补挂工具，不读取旧版会话文件。
 
 ## 配置
 
@@ -225,7 +215,7 @@ DSH Desktop（运行中）
 
 1. 插件配置中同时填写了 `provider` 与 `model`：使用这组显式覆盖。
 2. 未完整填写：读取 DSH 的 `agentDefaultModel.currentSelection()`，即该配置集当前选择的默认模型。
-3. 旧版 DSH 没有该服务且也没有完整显式配置：状态接口报告“模型未就绪”，新版 VS Code 面板会在
+3. 默认模型服务尚未就绪且也没有完整显式配置：状态接口报告“模型未就绪”，新版 VS Code 面板会在
    建会话前提示先选择模型。其它客户端也可调用 `dsh-door/status` 自检。
 
 只填写 `provider` 或 `model` 其中一项不会与 DSH 的值拼接；这组不完整配置会被忽略并记录诊断。
@@ -235,39 +225,15 @@ DSH 冷启动时，插件会先等待用户设置加载完成再开放端口，�
 
 | DSH | 历史会话 | 权限预设 |
 | --- | --- | --- |
-| `0.2.0-rc.1` / `0.2.0-rc.2` | 公开 `sessionQuery` 服务，v4 会话格式 | `catalog/current/resolve/set` |
-| `0.2.1-alpha.1` / `0.2.1-rc.2` / `0.2.1-rc.3` | 公开 `sessionQuery` 服务，v4 会话格式 | `catalog/current/resolve/set` |
-| `0.1.5-rc.2` | 只读解析本机 v3 会话文件 | `selectFor/permissionState/current/set` |
+| `0.2.1-rc.5` | 公开 `sessionQuery` 服务 | `catalog/current/resolve/set` |
 
-两条路径对外提供相同的 `dsh-door/…` 方法。接入点的状态回复会用 `historyKind`、
-`sessionFormat` 和 `permissionKind` 报告实际选中的适配器。不会在插件中私自解析 v4：
-该格式由 DSH 0.2 的 `sessionQuery` 负责读取和迁移。
+接入点只接受该精确 ACP 版本；历史持久格式和迁移均由内核负责。状态中的 `protocolVersion` 与 `runtime.acpVersion` 分别报告接入协议及实际 ACP 包版本；历史服务不可用时报告 `history: false`。
 
-状态中的可选 `protocolVersion` 与 `runtime.acpVersion` 分别报告接入协议及实际加载的 ACP 包版本。
-
-ACP `0.2.1-rc.2` 与 `0.2.1-rc.3` 可通过 `dsh-door/text/generate` 使用所属会话的当前模型直接生成文本。该路径发送空工具集合，不进入 Agent 工具调度；工具响应、错误或截断终态均拒绝，支持请求取消。未知版本或缺少直接流接口时不报告此能力。
-
-旧 npm 发行物的依赖使用版本范围：`DSH 0.1.5-rc.2` 可解析到 `ACP 0.1.5-rc.3`。兼容矩阵分别记录两个版本；依赖范围包含该 ACP 版本不表示已经验收同号的 DSH 发行物。
-无法识别的已有历史服务会报告 `history: false`，不尝试以旧格式读取新数据。
+`dsh-door/text/generate` 使用所属会话的当前模型直接生成文本，发送空工具集合，不进入 Agent 工具调度；工具响应、错误或截断终态均拒绝，支持请求取消。
 
 ## 版本变更
 
-| 版本 | 改了什么 |
-| --- | --- |
-| 0.1.0 | 兼容 DSH 0.2：历史使用公开 `sessionQuery` 和 v4 格式，权限使用新版 catalog 接口；保留 DSH 0.1 的 v3/`selectFor` 回退路径，并报告当前适配器。 |
-| 0.0.16 | 建立、恢复或关闭会话后及时释放连接内的请求期索引与挂载状态，避免长连接持续积累过期记录；关闭失败时保留仍有效的会话状态。 |
-| 0.0.15 | 卸载、重载或退出时完整关闭所有客户端连接；单条连接清理失败不再阻断其余连接。 |
-| 0.0.14 | 默认跟随 DSH 当前模型；新增安全状态接口；修复冷启动时用户设置尚未加载导致首次连接选错模型。 |
-| 0.0.13 | 固定接入点监听 `127.0.0.1`，配置中的其它监听地址会被忽略。 |
-| 0.0.12 | 新增 `dsh-door/permission/get` 与 `dsh-door/permission/set` 两个旁路方法：将内核 `@deepseek-ai/dsh-permission-presets` 的权限预设**清单与切换**透传给客户端（ACP 仅暴露模型与推理强度两个 config option，权限选择器属于其「刻意不提供」的 DSH 专用 UI 类别）。清单**不写死** —— 内核配置了什么就返回什么（`read-only`/`workspace-write`/`danger-full-access` 来自 `dsh-base`，`auto-approval` 由 `dsh-auto-approval-plugin` 添加，用户也可自行添加），因此客户端一侧与桌面端始终为同一真源。`permissionPresets` 是**可选**依赖（`ctx.inject`），档中未挂载该服务时该插件照常工作、仅返回「这个内核没有权限预设」。回归测试：`test/permission.js`（纯函数 29 项）+ 扩展一侧的 `test/permission-live.js`（真内核，四档全切一遍 24 项）。 |
-| 0.0.9 | **修复两个缺陷**：① 建会话**失败**时的预设指定会留在队列中，被**下一次**建会话取走（用户未指定却挂载了其它模式）—— 出错的回复原先未被处理（预筛要求该行含 `"result"`）；② 入站闸等待预设挂载**没有超时**，内核某个服务返回永不落定的 promise 时，`session/prompt` 会被永久阻塞 —— 症状为「发送消息后毫无响应、也没有任何报错」。现在入站与出站使用同一上限（`MOUNT_WAIT_MS`，经 `waitForMount()`），到时放行。<br>回归测试：`test/frames.js` 第 8 节第 (6) 段、第 9 节。 |
-| 0.0.8 | 新增 `dsh-door/sessions/list` 与 `dsh-door/sessions/get` 两个旁路方法（该插件只读解析 `$DSH_HOME/sessions`，多帧 zstd）。供「内核没有 `session/load`、面板又需查看历史」的场景使用。另修复出站中继必须返回 `WritableStream`（写成 `TransformStream` 且无人消费 readable 时，该插件的回复始终无法发出，客户端表现为「已连接但不应答」）。 |
-| 0.0.7 | 模式（agent preset）切换；修复「断线重连之后会话没有工具」（遇到预设锁时改用工厂期的 `mount()` 补挂）。 |
-| 0.0.5 | 首个可用版本。 |
-
-**注意**：DSH 0.2 的 `desktop` 档由 Electron 应用独占管理，命令行会拒绝
-`dsh plugin --profile desktop …`。请在 Desktop 的插件界面安装或更新本插件；命令面板中的
-**DSH：准备或修复自启配置**只处理可由命令行管理的 `vscode-panel` 档。
+见 [CHANGELOG.md](CHANGELOG.md)。
 
 ## 旁路方法：ACP 未提供的能力
 
@@ -296,7 +262,7 @@ ACP `0.2.1-rc.2` 与 `0.2.1-rc.3` 可通过 `dsh-door/text/generate` 使用所�
 2. 切换后**回读**再回复（`settledPermission`），不采用乐观更新：若某项设置被其它
    机制阻塞，客户端显示的是真实状态。
 
-历史方法在 DSH 0.2 上通过 `sessionQuery` 读取；只有 DSH 0.1 才使用只读 v3 文件适配。
+历史方法统一通过当前内核的 `sessionQuery` 读取，不提供直接文件读取退路。
 
 ## 从源码目录或 tgz 安装
 

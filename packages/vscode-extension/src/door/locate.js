@@ -16,12 +16,11 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { spawn, execFileSync } = require('node:child_process');
 const { runCommand, stopOwnedProcess } = require('./process');
-// `$DSH_HOME` 的判定只有一处（sessions.js），此处复用它以避免两处规则不一致。
-const { resolveSessionsRoot } = require('../dsh/sessions');
+const { resolveDshHome } = require('./home');
 
 /** `$DSH_HOME`（环境变量优先，否则 `~/.dsh`）。 */
 function dshHome(homedir, env = process.env) {
-  return path.dirname(resolveSessionsRoot({ homedir, env }));
+  return resolveDshHome({ homedir, env });
 }
 
 /** 探测某个端口是否可连接（不进行握手，仅探测 TCP）。 */

@@ -134,7 +134,14 @@ function verifyInstalledCandidate(candidate, installed, { root = installed } = {
   const walk = relative => {
     const file = path.join(target, relative), stat = fs.lstatSync(file), name = relative.replace(/\\/g, '/');
     assert(!stat.isSymbolicLink() && (stat.isFile() || stat.isDirectory()), 'Installed package contains a link or special file');
-    if (stat.isDirectory()) { assert(Object.keys(fresh.files).some(item => item.startsWith(name + '/')), 'Unexpected installed package directory: ' + name); for (const child of fs.readdirSync(file)) walk(path.join(relative, child)); return; }
+    if (stat.isDirectory()) {
+      // DSH/npm may add the package's declared runtime dependencies beside its archive files.
+      // These are not candidate contents; direct dependency versions are checked below.
+      if (fresh.kind === 'tgz' && name === 'node_modules') return;
+      assert(Object.keys(fresh.files).some(item => item.startsWith(name + '/')), 'Unexpected installed package directory: ' + name);
+      for (const child of fs.readdirSync(file)) walk(path.join(relative, child));
+      return;
+    }
     if (fresh.kind === 'vsix' && name === '.vsixmanifest') { assert.equal(sha256(file), fresh.installedManifestSha256, 'Installer manifest differs from candidate'); return; }
     assert(Object.hasOwn(fresh.files, name) && !found.has(name), 'Unexpected installed package file: ' + name); found.add(name);
     if (sha256(file) === fresh.files[name]) return;
@@ -148,7 +155,30 @@ function verifyInstalledCandidate(candidate, installed, { root = installed } = {
   for (const name of fs.readdirSync(target)) walk(name);
   for (const name of Object.keys(fresh.files)) assert(found.has(name), 'Missing installed package file: ' + name);
   assert.equal(sha256(candidate.file), candidate.sha256, 'Candidate changed during installation verification');
-  return { files: found.size, sha256: fresh.sha256 };
+  const runtimeDependencies = [];
+  if (fresh.kind === 'tgz' && fs.existsSync(path.join(target, 'node_modules'))) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
+    const { semver } = require('../compat/lib.cjs');
+    for (const [name, range] of Object.entries(manifest.dependencies || {})) {
+      const parts = name.split('/');
+      let parent = target, dependencyManifest;
+      while (!dependencyManifest) {
+        const candidateManifest = path.join(parent, 'node_modules', ...parts, 'package.json');
+        if (fs.existsSync(candidateManifest)) dependencyManifest = candidateManifest;
+        else {
+          const next = path.dirname(parent);
+          if (next === parent) break;
+          parent = next;
+        }
+      }
+      assert(dependencyManifest, `Installed runtime dependency is missing: ${name}`);
+      const dependency = JSON.parse(fs.readFileSync(dependencyManifest, 'utf8'));
+      assert.equal(dependency.name, name, `Installed runtime dependency identity differs: ${name}`);
+      assert(semver.valid(dependency.version) && semver.satisfies(dependency.version, range), `Installed runtime dependency version is outside ${range}: ${name}`);
+      runtimeDependencies.push({ name, version: dependency.version });
+    }
+  }
+  return { files: found.size, sha256: fresh.sha256, ...(fresh.kind === 'tgz' ? { runtimeDependencies } : {}) };
 }
 function candidates(options, { editor = false } = {}) {
   const required = editor ? ['tgz', 'sdk', 'vsix'] : ['tgz', 'sdk'];

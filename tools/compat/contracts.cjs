@@ -50,8 +50,9 @@ const redacted = safeObject({ apiKey: 'must-hide', nested: { path: path.join(os.
 assert(!JSON.stringify(redacted).includes('must-hide'));
 assert(!JSON.stringify(redacted).includes(os.homedir()));
 const current = versions();
-assert(semver.satisfies('0.2.1-rc.2', current.peer), 'DSH 0.2.1-rc.2 必须能够通过接入点依赖检查');
-assert(semver.satisfies('0.2.1-rc.3', current.peer), 'rc.3 适配候选必须能够通过精确依赖检查');
+assert.equal(current.peer, '0.2.1-rc.5');
+for (const old of ['0.1.5-rc.2','0.2.0-rc.1','0.2.0-rc.2','0.2.1-alpha.1','0.2.1-rc.2']) assert(!semver.satisfies(old, current.peer), '旧内核不得重新进入支持范围');
+assert(semver.satisfies('0.2.1-rc.5', current.peer), 'rc.5 适配候选必须能够通过精确依赖检查');
 assert(!semver.satisfies('0.2.1-rc.4', current.peer), '未知预发布版不应自动进入支持范围');
 const publicResult = publicEvidence({ status: 'passed', source: { commit: 'a'.repeat(40), fingerprint: 'b'.repeat(64), path: 'PRIVATE_PATH' },
   packages: current, runtime: { version: '0.2.0-rc.2', acpVersion: '0.2.0-rc.2', distribution: 'desktop', command: 'PRIVATE_COMMAND' },
@@ -61,7 +62,7 @@ const publicResult = publicEvidence({ status: 'passed', source: { commit: 'a'.re
 assert(!JSON.stringify(publicResult).includes('PRIVATE_'));
 assert.equal(publicResult.stages[0].status, 'passed'); assert.equal(publicResult.runtime.version, '0.2.0-rc.2');
 const state = { fingerprint: 'a'.repeat(64), toolFingerprint: 'b'.repeat(64), lockFingerprint: 'c'.repeat(64) };
-const report = { schemaVersion: 2, platform: 'win32', status: 'passed', packages: current, source: state, sourceStart: state, sourceEnd: state, runtime: { version: '0.2.0-rc.1', acpVersion: '0.2.0-rc.1', distribution: 'npm' }, artifacts: [{kind: 'tgz', sha256: 'd'.repeat(64)}], stages: REQUIRED.map((name) => ({ name, status: 'passed' })) };
+const report = { schemaVersion: 2, platform: 'win32', status: 'passed', packages: current, source: state, sourceStart: state, sourceEnd: state, runtime: { version: '0.2.1-rc.5', acpVersion: '0.2.1-rc.5', distribution: 'npm' }, artifacts: [{kind: 'tgz', sha256: 'd'.repeat(64)}], stages: [...REQUIRED, 'text-generation'].map((name) => ({ name, status: 'passed' })) };
 assert.deepEqual(validateReport(report, current, state), []);
 assert(validateReport({ ...report, stages: report.stages.filter((item) => item.name !== 'tools') }, current, state).some((issue) => issue.includes('tools')));
 assert(validateReport({ ...report, stages: report.stages.map((item) => item.name === 'tools' ? { ...item, status: 'skipped' } : item) }, current, state).some((issue) => issue.includes('tools')));
@@ -93,7 +94,7 @@ const editorMatrix = json(path.join(ROOT, 'compat/editors.json'));
   assert(validateEditorEvidence({ ...evidence, checks: evidence.checks.filter(check => check.name !== 'native composer Git diff snapshot') }, evidence.vsixSha256, current, state).length);
   assert(validateEditorEvidence({ ...evidence, checks: evidence.checks.filter(check => check.name !== 'sidebar receives unsaved file reference') }, evidence.vsixSha256, current, state).length);
 }
-if (editorMatrix.supported?.length) {
+if (editorMatrix.supported?.some(entry => entry.evidence)) {
   const { validateHistoricalEditor: validateEditorEvidence } = require('./release-check.cjs');
   const evidence = json(path.join(ROOT, editorMatrix.supported[0].evidence));
   const state = { fingerprint: evidence.source.fingerprint };
@@ -106,7 +107,9 @@ if (editorMatrix.supported?.length) {
   assert(validateEditorEvidence(evidence, evidence.vsixSha256, testedPackages, { fingerprint: 'changed' }).length);
 }
 assert.equal(editorMatrix.minimum, json(path.join(ROOT, 'packages/vscode-extension/package.json')).engines.vscode.replace(/^\^/, ''));
-assert.equal(json(path.join(ROOT, editorMatrix.evidence)).editor, editorMatrix.minimum);
+if (editorMatrix.evidence) assert.equal(json(path.join(ROOT, editorMatrix.evidence)).editor, editorMatrix.minimum);
+else assert.equal(editorMatrix.status, 'pending');
+assert(matrix.versions.every(item => item.dsh === '0.2.1-rc.5'));
 for (const entry of matrix.versions) {
   assert(semver.valid(entry.dsh));
   assert(['pending', 'passed', 'failed'].includes(entry.status));

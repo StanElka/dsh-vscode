@@ -17,7 +17,7 @@ const unavailable = discoveryResult(matrix, undefined, undefined, [{ source: 're
 assert.deepEqual(unavailable.matrix, discovered.matrix); assert.equal(unavailable.acquisitionIssues.length, 1);
 assert.throws(() => classifyProbe({ status: 'failed' }, true), /required/);
 
-const current = versions(), requested = '0.2.1-rc.4';
+const current = versions(), requested = '0.2.1-rc.6';
 const state = { commit: 'a'.repeat(40), fingerprint: 'b'.repeat(64), toolFingerprint: 'c'.repeat(64), lockFingerprint: 'd'.repeat(64) };
 const clone = value => structuredClone(value);
 function gateMessage(label = 'requirements') {
@@ -50,7 +50,7 @@ function rejected(error = gateMessage()) {
 function completed() {
   const report = rejected(); delete report.error; report.status = 'passed';
   // The runtime version and resolved ACP version are deliberately different.
-  report.runtime.acpVersion = '0.2.1-rc.2';
+  report.runtime.acpVersion = '0.2.1-rc.5';
   report.stages = [...new Set([...REQUIRED, 'loopback-environment', 'text-generation'])].map(name => ({ name, status: 'passed' }));
   report.stages.find(item => item.name === 'package').evidence = { sha256: report.artifacts[0].sha256 };
   report.stages.find(item => item.name === 'runtime').evidence = { version: requested, distribution: 'npm', acpVersion: report.runtime.acpVersion };
@@ -103,7 +103,7 @@ mutate('runtime version mismatch', report => { report.runtime.version = '9.9.9';
 mutate('runtime stage mismatch', report => { report.stages[2].evidence.version = '9.9.9'; });
 mutate('missing actual ACP', report => { delete report.runtime.acpVersion; });
 mutate('ACP stage mismatch', report => { report.stages[2].evidence.acpVersion = '9.9.9'; });
-mutate('ACP already inside the gate range', report => { report.runtime.acpVersion = report.stages[2].evidence.acpVersion = '0.2.1-rc.2'; });
+mutate('ACP already inside the gate range', report => { report.runtime.acpVersion = report.stages[2].evidence.acpVersion = '0.2.1-rc.5'; });
 mutate('another top-level failure', report => { report.error = 'PRIVATE_ERROR'; });
 mutate('passed label contradicts installation failure', report => { report.status = 'passed'; });
 for (const [name, error] of [
@@ -127,9 +127,10 @@ mutate('passed with status ACP mismatch', report => { report.stages.find(item =>
 mutate('passed with resource abort', report => { report.resources.abort = 'Validation cancelled'; }, completed());
 for (const item of cases) assert.equal(classifyProbe(item.report), item.status, item.name);
 const declaredMatrix = JSON.parse(fs.readFileSync(path.join(ROOT, 'compat/versions.json')));
-const supported = declaredMatrix.versions.find(item => item.distribution === 'npm' && item.dsh !== '0.2.1-rc.3').dsh;
-assert.equal(supportedMatrix(declaredMatrix).matrix.include.filter(item => item.dsh === '0.2.1-rc.3').length, 2);
-assert.deepEqual(discoveryResult(declaredMatrix, { versions: { '0.2.1-rc.3': {}, '0.2.1-rc.4': {} } }, []).probes.include.map(item => item.dsh), ['0.2.1-rc.4', '0.2.1-rc.4']);
+const supported = declaredMatrix.versions.find(item => item.distribution === 'npm').dsh;
+assert.equal(supportedMatrix(declaredMatrix).matrix.include.filter(item => item.dsh === '0.2.1-rc.5').length, 2);
+assert.deepEqual(discoveryResult(declaredMatrix, { versions: { '0.2.1-rc.5': {}, '0.2.1-rc.6': {} } }, []).probes.include.map(item => item.dsh), ['0.2.1-rc.6', '0.2.1-rc.6']);
+assert.equal(discoveryResult(declaredMatrix, { versions: { '0.2.0': {}, '0.2.1-rc.2': {}, '0.2.1-rc.5': {} } }, []).probes.include.length, 0, 'Retired kernels must not return as scheduled probes');
 assert.throws(() => classifyProbe({ ...rejected(), requested: supported }), /required regression/);
 
 const fixture = require('../test-workspace.cjs').createFixture('probe-cli');
@@ -171,16 +172,16 @@ try {
   }
   const declared = cli(rejected(), supported); assert.equal(declared.child.status, 1); assert.match(declared.child.stderr, /supported regression/); assert.equal(declared.result, undefined);
   const declaredAlias = cli(rejected(), 'v' + supported); assert.equal(declaredAlias.child.status, 1); assert.match(declaredAlias.child.stderr, /supported regression/); assert.equal(declaredAlias.result, undefined);
-  const rc3 = cli(rejected(), '0.2.1-rc.3'); assert.equal(rc3.child.status, 1); assert.match(rc3.child.stderr, /supported regression/); assert.equal(rc3.result, undefined);
+  const rc3 = cli(rejected(), '0.2.1-rc.5'); assert.equal(rc3.child.status, 1); assert.match(rc3.child.stderr, /supported regression/); assert.equal(rc3.result, undefined);
   const mismatched = cli(rejected(), '9.9.9'); assert.equal(mismatched.child.status, 1); assert.equal(mismatched.result.status, 'incompatible');
 
   const runtime = path.join(fixture, 'runtime/node_modules/@deepseek-ai/dsh'), acp = path.join(fixture, 'runtime/node_modules/@deepseek-ai/dsh-acp');
   fs.mkdirSync(path.join(runtime, 'lib'), { recursive: true }); fs.mkdirSync(acp, { recursive: true });
   fs.writeFileSync(path.join(runtime, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh', version: requested }));
-  fs.writeFileSync(path.join(acp, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-acp', version: '0.2.1-rc.2', exports: { './package.json': './package.json' } }));
+  fs.writeFileSync(path.join(acp, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-acp', version: '0.2.1-rc.5', exports: { './package.json': './package.json' } }));
   const entry = path.join(runtime, 'lib/bin.js'); fs.writeFileSync(entry, '');
   const { npmRuntimeInfo } = require('./test.cjs');
-  assert.deepEqual(npmRuntimeInfo(entry, requested), { acpVersion: '0.2.1-rc.2' });
+  assert.deepEqual(npmRuntimeInfo(entry, requested), { acpVersion: '0.2.1-rc.5' });
   assert.throws(() => npmRuntimeInfo(entry, '9.9.9'));
   fs.writeFileSync(path.join(acp, 'package.json'), JSON.stringify({ name: '@deepseek-ai/dsh-acp', version: 'unknown' }));
   assert.throws(() => npmRuntimeInfo(entry, requested), /ACP/);

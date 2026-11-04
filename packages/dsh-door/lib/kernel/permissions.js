@@ -1,10 +1,5 @@
 /**
- * Compatibility adapter for the permissionPresets service.
- *
- * DSH 0.1 exposed selectFor(permissionState(session)); DSH 0.2 exposes a
- * process-level catalog().  Both lines retain current(session), resolve(name)
- * and set(session, name).  Keep the shape switch here so the TCP/JSON-RPC
- * bridge never needs to know which kernel generation it is serving.
+ * DSH rc.3 permissionPresets catalog used by the local bridge.
  */
 
 import {
@@ -25,30 +20,14 @@ export function permissionApiKind(service) {
   ) {
     return 'catalog';
   }
-  if (
-    service &&
-    typeof service.selectFor === 'function' &&
-    typeof service.permissionState === 'function' &&
-    typeof service.current === 'function' &&
-    typeof service.set === 'function'
-  ) {
-    return 'select-for';
-  }
   return undefined;
 }
 
-function catalogFor(service, kind, session) {
-  if (kind === 'catalog') {
-    const catalog = service.catalog() || {};
-    return {
-      options: catalog.options,
-      defaultPreset: catalog.defaultPreset ?? service.defaultPreset,
-    };
-  }
-  const selected = service.selectFor(service.permissionState(session)) || {};
+function catalogFor(service) {
+  const catalog = service.catalog() || {};
   return {
-    options: selected.options,
-    defaultPreset: service.defaultPreset,
+    options: catalog.options,
+    defaultPreset: catalog.defaultPreset ?? service.defaultPreset,
   };
 }
 
@@ -81,7 +60,7 @@ export function createPermissionHandler(ctx, diag = () => {}) {
   };
 
   const read = (session) => {
-    const catalog = catalogFor(service, kind, session);
+    const catalog = catalogFor(service);
     return permissionPayload({
       currentValue: service.current(session),
       options: catalog.options,
@@ -100,7 +79,7 @@ export function createPermissionHandler(ctx, diag = () => {}) {
         if (typeof service.resolve === 'function') {
           service.resolve(value);
         } else {
-          const options = catalogFor(service, kind, session).options;
+          const options = catalogFor(service).options;
           if (!Array.isArray(options) || !options.some((item) => item?.value === value)) {
             throw new Error(`permission: unknown preset "${value}"`);
           }

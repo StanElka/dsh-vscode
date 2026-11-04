@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const zlib = require('node:zlib');
 const { execFileSync } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { referenceAttachments, filterSkillGroups } = require('../src/chat/context');
@@ -62,15 +61,6 @@ const disposable = { dispose() {} };
   assert.equal((await handler.list({ query: 'needle' })).sessions[0].id, 'session-204');
   assert.equal((await handler.list({ offset: 100, limit: 100 })).nextOffset, 200);
   assert.equal((await handler.list({ cwd, query: 'needle' })).total, 1);
-  const historyRoot = path.join(cwd, 'history');
-  for (let i = 0; i < 105; i++) {
-    const folder = path.join(historyRoot, 'group', 'session-' + i); fs.mkdirSync(folder, { recursive: true });
-    const events = [{ type: 'session', version: 3, id: 'session-' + i, cwd }, { type: 'session/title', time: i, data: { title: i === 0 ? 'oldest needle' : 'other' } }];
-    const target = path.join(folder, 'session.v3.jsonl.zstd'); fs.writeFileSync(target, zlib.zstdCompressSync(events.map(item => JSON.stringify(item)).join('\n'))); fs.utimesSync(target, i + 1, i + 1);
-  }
-  const extensionHistory = require('../src/dsh/sessions'), doorHistory = await import(pathToFileURL(path.resolve(__dirname, '../../dsh-door/lib/sessions.js')));
-  for (const options of [{ offset: 100 }, { query: 'needle' }, { cwd, limit: 20, offset: 80 }]) assert.deepEqual(extensionHistory.listSessions(historyRoot, options), doorHistory.listSessions(historyRoot, options));
-  assert.equal(extensionHistory.listSessions(historyRoot, { query: 'needle' }).sessions[0].id, 'session-0');
   const exported = historyMarkdown({ card: { id: 'one', title: 'Export' }, entries: [{ kind: 'user', text: 'Question' }, { kind: 'assistant', text: 'Answer', thinking: 'Reason' }, { kind: 'tool', tool: { content: '```' } }], truncated: true });
   assert(exported.includes('Question') && exported.includes('Answer') && exported.includes('Reason') && exported.includes('截断'));
 

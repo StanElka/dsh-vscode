@@ -1,18 +1,5 @@
-/**
- * History compatibility adapter.
- *
- * DSH 0.2 publishes ctx.sessionQuery, which owns format migration and exact
- * live/persisted reads.  Older kernels are served by the existing read-only v3
- * disk reader.  Do not add a private v4 decoder here: sessionQuery is the
- * supported boundary and remains valid if the persistence backend changes.
- */
-
-import {
-  getSessionAsync,
-  listSessionsAsync,
-  sessionTranscript,
-  summarizeSession,
-} from '../sessions.js';
+/** History is read through DSH rc.3 public sessionQuery; persistence stays owned by the kernel. */
+import { sessionTranscript, summarizeSession } from '../history-events.js';
 import historyQuery from '../history-query.cjs';
 import { archiveSnapshot, archiveMetadata, setHistoryArchived } from './history-archive.js';
 const { historyOptions, matchesHistory, historyPage, pageMetadata } = historyQuery;
@@ -133,21 +120,6 @@ export function createSessionQueryHistory(service, diag = () => {}, { getWorkspa
         }
         throw error;
       }
-    },
-  };
-}
-
-/** Create the legacy read-only v3 history handler. */
-export function createLegacyHistory(root) {
-  return {
-    kind: 'legacy-v3-disk',
-    async list(params = {}) {
-      const { error, ...result } = await listSessionsAsync(root, params);
-      if (error) throw new Error(error);
-      return result;
-    },
-    async get(id, options = {}) {
-      return getSessionAsync(root, id, options);
     },
   };
 }
