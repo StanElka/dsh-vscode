@@ -18,7 +18,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { pathToFileURL } = require('node:url');
 const { SCENARIOS, buildHtml, buildReplayScript, OUT, ROOT } = require('./preview');
 const { findChrome, missingChromeMessage } = require('./chrome.cjs');
@@ -2325,7 +2325,56 @@ function assertionsScript(scene) {
 </script>`;
 }
 
-function runChrome(scene, profile) {
+// FileReader completes on real I/O, which Chrome's virtual-time budget does not wait for.
+// Observe the image scene in real time instead of letting --dump-dom finish early.
+async function readImageScene(url, profile, platformArgs) {
+  const portFile = path.join(profile, 'DevToolsActivePort');
+  fs.rmSync(portFile, { force: true });
+  const child = spawn(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
+    ...platformArgs, '--force-device-scale-factor=1', '--window-size=420,900', '--remote-debugging-port=0', `--user-data-dir=${profile}`, url],
+  { stdio: 'ignore', windowsHide: true });
+  let socket;
+  try {
+    const deadline = Date.now() + CHROME_TIMEOUT_MS;
+    let target;
+    while (Date.now() < deadline && !target) {
+      if (child.exitCode !== null) throw new Error('Chrome 在界面验收前退出');
+      try {
+        const port = fs.readFileSync(portFile, 'utf8').split('\n')[0];
+        const response = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(2000) });
+        target = (await response.json()).find(item => item.type === 'page' && item.url === url);
+      } catch { /* Chrome may still be starting. */ }
+      if (!target) await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    if (!target) throw new Error('等待 Chrome 页面超时');
+    socket = new WebSocket(target.webSocketDebuggerUrl);
+    await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+    const text = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('等待图片场景断言超时')), Math.max(1, deadline - Date.now()));
+      socket.onmessage = ({ data }) => {
+        const message = JSON.parse(data);
+        if (message.id !== 1) return;
+        clearTimeout(timer);
+        if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message.error || message.result.exceptionDetails)));
+        else resolve(message.result.result.value);
+      };
+      socket.onerror = () => { clearTimeout(timer); reject(new Error('Chrome 调试连接失败')); };
+      socket.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: {
+        expression: `new Promise(resolve => { const poll = () => { const result = document.querySelector('#__results, #__pageerror'); if (result) resolve(JSON.stringify({ id: result.id, text: result.textContent })); else setTimeout(poll, 50); }; poll(); })`,
+        awaitPromise: true, returnByValue: true,
+      } }));
+    });
+    const result = JSON.parse(text);
+    if (result.id === '__pageerror') return { error: `页面错误：${result.text}` };
+    return { results: JSON.parse(result.text).results };
+  } finally {
+    socket?.close();
+    if (child.exitCode === null) child.kill();
+    if (child.exitCode === null) await Promise.race([new Promise(resolve => child.once('exit', resolve)), new Promise(resolve => setTimeout(resolve, 3000))]);
+  }
+}
+
+async function runChrome(scene, profile) {
   const html = buildHtml('dark');
   const steps = TEST_SCENARIOS[scene]().steps;
   // 错误捕获器需置于**最前面**：此后任何一段内联脚本（包括断言脚本）
@@ -2345,6 +2394,7 @@ function runChrome(scene, profile) {
   const dom = path.join(WORK, `${scene}.dom.html`);
   const url = pathToFileURL(page).href;
   const platformArgs = process.platform === 'darwin' ? ['--use-mock-keychain', '--password-store=basic'] : [];
+  if (scene === 'images') return readImageScene(url, profile, platformArgs);
   fs.writeFileSync(dom, execFileSync(CHROME, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--no-first-run', '--no-default-browser-check',
     ...platformArgs, '--force-device-scale-factor=1', '--window-size=420,900', '--virtual-time-budget=9000', `--user-data-dir=${profile}`, '--dump-dom', url],
   { maxBuffer: 16 * 1024 * 1024, timeout: CHROME_TIMEOUT_MS, killSignal: 'SIGKILL', windowsHide: true }));
@@ -2364,7 +2414,7 @@ function runChrome(scene, profile) {
   return { results: JSON.parse(match[1]).results };
 }
 
-function main() {
+async function main() {
   if (!CHROME) {
     console.log(missingChromeMessage());
     process.exit(2);
@@ -2389,7 +2439,7 @@ function main() {
     console.log(`\n── 场景：${scene} ${'─'.repeat(Math.max(0, 40 - scene.length))}`);
     let outcome;
     try {
-      outcome = runChrome(scene, profile);
+      outcome = await runChrome(scene, profile);
     } catch (error) {
       outcome = { error: error.message, fatal: error.code === 'ETIMEDOUT' };
     }
@@ -2424,5 +2474,5 @@ function main() {
   }
 }
 
-if (require.main === module) main();
+if (require.main === module) main().catch(error => { console.error(error); process.exitCode = 1; });
 module.exports = { assertionsScript, TEST_SCENARIOS, EXPECTATIONS };
