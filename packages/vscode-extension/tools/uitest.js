@@ -326,6 +326,16 @@ function assertionsScript(scene) {
     if (EXPECT.imagesScene) {
       var receiveImageUi = function (message) { window.dispatchEvent(new MessageEvent('message', { data: message })); };
       var settleImageUi = function () { return new Promise(function (resolve) { setTimeout(resolve, 160); }); };
+      var observeImageReadUi = function () {
+        var original = FileReader.prototype.readAsDataURL;
+        return new Promise(function (resolve) {
+          FileReader.prototype.readAsDataURL = function () {
+            FileReader.prototype.readAsDataURL = original;
+            this.addEventListener('loadend', resolve, { once: true });
+            return original.apply(this, arguments);
+          };
+        });
+      };
       var waitImageRequestUi = async function (previous) {
         for (var attempt = 0; attempt < 100; attempt++) {
           var request = window.__received.filter(function (m) { return m.type === 'imageAdd' && (!previous || m.requestId !== previous.requestId); }).pop();
@@ -376,7 +386,9 @@ function assertionsScript(scene) {
       var gifBytesImageUi = Uint8Array.from(atob(gifImageUi), function (character) { return character.charCodeAt(0); });
       var gifFileImageUi = new File([gifBytesImageUi], 'animation.gif', { type: 'image/gif' });
       var pasteDataImageUi = new DataTransfer(); pasteDataImageUi.items.add(gifFileImageUi);
+      var pasteReadImageUi = observeImageReadUi();
       draftImageUi.dispatchEvent(new ClipboardEvent('paste', { clipboardData: pasteDataImageUi, bubbles: true, cancelable: true }));
+      await pasteReadImageUi;
       var pasteRequestImageUi = await waitImageRequestUi();
       assert('粘贴GIF保留原始字节与格式', !!pasteRequestImageUi && pasteRequestImageUi.mimeType === 'image/gif' && pasteRequestImageUi.data === gifImageUi && draftImageUi.value === '已有问题', JSON.stringify({ request: pasteRequestImageUi, hint: document.getElementById('hint').textContent, files: pasteDataImageUi.files.length }));
       var gifHashImageUi = 'b'.repeat(64);
@@ -386,7 +398,9 @@ function assertionsScript(scene) {
       assert('粘贴图片保存的仍是引用', window.__draftState.attachments.length === 1 && window.__draftState.attachments[0].mimeType === 'image/gif' && JSON.stringify(window.__draftState).indexOf(gifImageUi) < 0);
       document.querySelector('#attachments .chip-close').click();
       var dropDataImageUi = new DataTransfer(); dropDataImageUi.items.add(gifFileImageUi);
+      var dropReadImageUi = observeImageReadUi();
       document.querySelector('.composer').dispatchEvent(new DragEvent('drop', { dataTransfer: dropDataImageUi, bubbles: true, cancelable: true }));
+      await dropReadImageUi;
       var dropRequestImageUi = await waitImageRequestUi(pasteRequestImageUi);
       assert('拖入图片进入相同的验证流程', !!dropRequestImageUi && dropRequestImageUi.requestId !== pasteRequestImageUi.requestId && dropRequestImageUi.data === gifImageUi);
       receiveImageUi({ type: 'imageAdded', requestId: dropRequestImageUi && dropRequestImageUi.requestId, cwd: scopeImageUi.cwd, sessionId: scopeImageUi.sessionId, items: [gifItemImageUi], previews: [{ id: gifItemImageUi.id, dataUrl: 'data:image/gif;base64,' + gifImageUi }] });
