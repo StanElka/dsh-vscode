@@ -49,7 +49,7 @@ try {
     assert.equal(pkg.version, pilot.candidate);
     assert(fs.readFileSync(path.join(packaged, 'lib/index.js'), 'utf8').includes(`version: '${pkg.version}'`), 'Bridge provider must advertise the installed candidate version');
     for (const [name, range] of Object.entries(pkg.peerDependencies || {})) if (name.startsWith('@deepseek-ai/dsh')) {
-      assert(require('semver').satisfies('0.2.1-rc.5', range), name + ' must accept the exact rc.5 runtime');
+      assert(require('semver').satisfies(require('../compat/lib.cjs').versions().peer, range), name + ' must accept the declared runtime');
       assert(!require('semver').satisfies('0.2.1-rc.6', range), name + ' must not accept an unknown prerelease');
     }
   }

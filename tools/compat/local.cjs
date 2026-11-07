@@ -123,7 +123,7 @@ async function local(options) {
     await client.connect();
     const status = await client.doorStatus();
     assert.equal(status.version, versions().door);
-    assert.equal(status.runtime?.acpVersion, options.dsh || '0.2.1-rc.5');
+    assert.equal(status.runtime?.acpVersion, options.dsh || versions().peer);
     assert(status.model.ready);
     const cwd = path.join(resources.work, 'workspace'); fs.mkdirSync(cwd);
     session = new DshSession({ client }); await session.start({ cwd, preset: 'standard' });

@@ -1,8 +1,8 @@
 /** Exact-model image admission diagnostics over the existing native ACP wire. */
 import { randomUUID, createHash } from 'node:crypto';
+import { ACP_TARGET_VERSION } from './runtime.js';
 export const IMAGE_CAPABILITIES_METHOD = 'dsh-door/images/capabilities';
 export const IMAGE_READ_METHOD = 'dsh-door/images/read';
-const NATIVE_IMAGE_RUNTIMES = new Set(['0.2.1-rc.5']);
 const MEDIA_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const fail = (message, code) => { throw Object.assign(new Error(message), { code }); };
 
@@ -44,12 +44,12 @@ function imageTools(agent) {
 export async function resolveImageCapabilities(state, sessionId, { signal } = {}) {
   const agent = state.agentsBySession?.get(sessionId);
   if (!state.sessions?.has(sessionId) || !agent) fail('会话不属于当前连接', -32003);
-  const route = state.textModels?.get(sessionId);
+  const route = agent.model.current();
   const tools = imageTools(agent);
   const base = { ...(route ? { provider: route.provider, model: route.model } : {}), ...(tools ? { tools } : {}) };
   const unsupported = (reason, extra = {}) => ({ ...base, ...extra, input: false, mode: 'unsupported', reason });
   if (!route) return unsupported('model-route-unresolved');
-  if (!NATIVE_IMAGE_RUNTIMES.has(state.imageRuntimeVersion)) return unsupported('acp-image-unsupported');
+  if (state.imageRuntimeVersion !== ACP_TARGET_VERSION) return unsupported('acp-image-unsupported');
   const attachments = state.imageAttachments;
   const limits = limitsOf(attachments);
   if (!limits || typeof attachments.saveImages !== 'function' || typeof attachments.readImage !== 'function') return unsupported('attachment-service-unavailable');
@@ -63,7 +63,7 @@ export async function resolveImageCapabilities(state, sessionId, { signal } = {}
   }
   signal?.throwIfAborted();
   if (!state.sessions.has(sessionId) || state.agentsBySession.get(sessionId) !== agent) fail('会话已关闭或更换', -32003);
-  const current = state.textModels.get(sessionId);
+  const current = agent.model.current();
   if (current?.provider !== route.provider || current?.model !== route.model) fail('模型已变化，请重新检查图片能力', -32042);
   const inputModalities = Array.isArray(info?.inputModalities) ? info.inputModalities.filter(type => typeof type === 'string' && type.length <= 32).slice(0, 16) : [];
   if (!inputModalities.includes('image')) return unsupported('model-does-not-declare-image', { inputModalities, limits });

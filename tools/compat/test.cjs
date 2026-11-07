@@ -102,8 +102,8 @@ async function run(options) {
     fs.writeFileSync(patch, [
       '- id: llm-pi-ai', '  config:', '    providers:', '      compat-fixture:', '        api: openai-completions',
       `        baseURL: ${provider.url}`, '        apiKeyEnv: DSH_COMPAT_FIXTURE_KEY', '        models:', '          - id: compat-model',
-      '            name: Compatibility fixture', '            contextWindow: 32768', '            maxTokens: 4096',
-      '          - id: compat-model-b', '            name: Compatibility alternate', '            contextWindow: 32768', '            maxTokens: 4096',
+      '            name: Compatibility fixture', '            input: [text, image]', '            contextWindow: 32768', '            maxTokens: 4096',
+      '          - id: compat-model-b', '            name: Compatibility alternate', '            input: [text]', '            contextWindow: 32768', '            maxTokens: 4096',
       '- id: acp-door', '  config:', '    provider: compat-fixture', '    model: compat-model',
       '- id: session-title-llm', '  disabled: true', '',
     ].join('\n'));
@@ -138,7 +138,7 @@ async function run(options) {
     });
     const sessionId = session.sessionId;
     const directText = (await client.doorStatus()).capabilities?.textGeneration;
-    const directRequired = report.runtime.acpVersion === '0.2.1-rc.5';
+    const directRequired = semver.satisfies(report.runtime.acpVersion, report.packages.peer);
     const assertTextRequests = (requests, model) => {
       assert(requests.length > 0, '直接生成未到达模型服务');
       for (const request of requests) {
@@ -189,14 +189,37 @@ async function run(options) {
       const choices = flat(model?.options);
       const alternative = choices.find((item) => String(item.value).includes('compat-model-b'));
       assert(alternative, '测试模型目录缺少第二个模型');
+      const imageCapabilities = id => client.request('dsh-door/images/capabilities', { sessionId: id });
+      if (directRequired) {
+        const vision = await imageCapabilities(sessionId);
+        assert.equal(vision.model, 'compat-model'); assert.equal(vision.input, true);
+        const imageSession = new DshSession({ client });
+        try {
+          await imageSession.start({ cwd, preset: 'standard' });
+          const png = 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAFklEQVR4nGMQVDImCTGMahjVMHw1AAAaNGYB4V8qqwAAAABJRU5ErkJggg==';
+          const before = provider.requests.length;
+          const response = await bounded(client.prompt(imageSession.sessionId, 'COMPAT_IMAGE', { attachments: [{ kind: 'image', mimeType: 'image/png', data: png }] }));
+          assert.equal(response.stopReason, 'end_turn');
+          assert(provider.requests.slice(before).some(request => request.messages.some(message =>
+            message.role === 'user' && Array.isArray(message.content) && message.content.some(part =>
+              part.type === 'image_url' && part.image_url?.url?.startsWith('data:image/png;base64,')))), '模型服务未收到 ACP 图片');
+        } finally {
+          try { if (imageSession.sessionId) await client.closeSession(imageSession.sessionId); }
+          finally { imageSession.dispose(); }
+        }
+      }
       await session.setModel(alternative.value);
+      if (directRequired) {
+        const text = await imageCapabilities(sessionId);
+        assert.equal(text.model, 'compat-model-b'); assert.equal(text.reason, 'model-does-not-declare-image');
+      }
       assert.equal(session.configOptions.find((item) => item.id === 'model').currentValue, alternative.value);
       if (directRequired) {
         const before = provider.requests.length;
         const answer = await client.request('dsh-door/text/generate', { sessionId, prompt: 'COMPAT_STREAM' });
         assert.equal(answer.text, 'COMPAT_OK'); assertTextRequests(provider.requests.slice(before), 'compat-model-b');
       }
-      return { changed: true, directRouteChecked: directRequired };
+      return { changed: true, directRouteChecked: directRequired, imageRouteChecked: directRequired };
     });
     await stage('preset-switch', async () => {
       const alternative = session.doorMeta.presets.find((item) => item.id !== 'standard');
@@ -285,7 +308,13 @@ async function run(options) {
       }, 5000);
       assert(restored);
       await bounded(session.send('COMPAT_RESUME')); assert.equal(session.sessionId, sessionId);
-      return { restored: true };
+      if (directRequired) {
+        const before = provider.requests.length;
+        const answer = await client.request('dsh-door/text/generate', { sessionId, prompt: 'COMPAT_STREAM' });
+        assert.equal(answer.text, 'COMPAT_OK');
+        assertTextRequests(provider.requests.slice(before), 'compat-model-b');
+      }
+      return { restored: true, directRouteChecked: directRequired };
     });
     await stage('cancel', async () => {
       const before = provider.requests.length;

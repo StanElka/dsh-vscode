@@ -1,5 +1,5 @@
 #requires -Version 7.0
-param([string]$DshVersion = '0.2.1-rc.5', [switch]$UsePackedVsix, [Parameter(Mandatory)][string]$Vsix, [Parameter(Mandatory)][string]$Tgz, [Parameter(Mandatory)][string]$Sdk)
+param([string]$DshVersion = '0.2.2-rc.1', [switch]$UsePackedVsix, [Parameter(Mandatory)][string]$Vsix, [Parameter(Mandatory)][string]$Tgz, [Parameter(Mandatory)][string]$Sdk)
 # 在普通 PowerShell 中复测最低编辑器，不使用诊断启动标志或身份检查豁免。
 $ErrorActionPreference = 'Stop'
 $projectDirectory = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..\..')).Path

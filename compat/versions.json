@@ -1,11 +1,14 @@
 {
   "schemaVersion": 2,
   "currentRelease": {
-    "status": "pending",
-    "panel": "0.19.1",
-    "door": "0.7.1",
+    "status": "passed",
+    "panel": "0.19.2",
+    "door": "0.7.2",
     "sdk": "0.1.1",
-    "evidence": []
+    "evidence": [
+      "compat/evidence/public-dsh-0.2.2-rc.1-npm-win32-door-0.7.2-panel-0.19.2-sdk-0.1.1-22db8d514d0dba780cf292bc.json",
+      "compat/evidence/public-dsh-0.2.2-rc.1-desktop-win32-door-0.7.2-panel-0.19.2-sdk-0.1.1-771a94c27bba80b49e62d19e.json"
+    ]
   },
   "platform": "win32",
   "sources": {
@@ -14,16 +17,52 @@
   },
   "versions": [
     {
-      "dsh": "0.2.1-rc.5",
+      "dsh": "0.2.2-rc.1",
       "distribution": "npm",
       "status": "pending",
       "evidence": []
     },
     {
-      "dsh": "0.2.1-rc.5",
+      "dsh": "0.2.2-rc.1",
       "distribution": "desktop",
       "status": "pending",
       "evidence": []
+    },
+    {
+      "dsh": "0.2.2-rc.1",
+      "distribution": "npm",
+      "platform": "win32",
+      "panel": "0.19.2",
+      "door": "0.7.2",
+      "sdk": "0.1.1",
+      "status": "passed",
+      "acp": "0.2.2-rc.1",
+      "testedAt": "2026-11-07T01:54:20.370Z",
+      "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+      "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+      "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0",
+      "tgzSha256": "56c13303a8a07d718941afd93debb43144e73f33fc651b9df7d61f80267b3b56",
+      "evidence": [
+        "compat/evidence/public-dsh-0.2.2-rc.1-npm-win32-door-0.7.2-panel-0.19.2-sdk-0.1.1-22db8d514d0dba780cf292bc.json"
+      ]
+    },
+    {
+      "dsh": "0.2.2-rc.1",
+      "distribution": "desktop",
+      "platform": "win32",
+      "panel": "0.19.2",
+      "door": "0.7.2",
+      "sdk": "0.1.1",
+      "status": "passed",
+      "acp": "0.2.2-rc.1",
+      "testedAt": "2026-11-07T01:54:18.429Z",
+      "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+      "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+      "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0",
+      "tgzSha256": "56c13303a8a07d718941afd93debb43144e73f33fc651b9df7d61f80267b3b56",
+      "evidence": [
+        "compat/evidence/public-dsh-0.2.2-rc.1-desktop-win32-door-0.7.2-panel-0.19.2-sdk-0.1.1-771a94c27bba80b49e62d19e.json"
+      ]
     }
   ],
   "historical": [

@@ -1,0 +1,327 @@
+{
+  "schemaVersion": 2,
+  "status": "passed",
+  "platform": "win32",
+  "editor": "1.91.1",
+  "defaultLaunch": true,
+  "source": {
+    "commit": "ddb2c62d5a107c23f419d34d3220abec3e1e7d24",
+    "dirty": true,
+    "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+    "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+    "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0"
+  },
+  "sourceStart": {
+    "commit": "ddb2c62d5a107c23f419d34d3220abec3e1e7d24",
+    "dirty": true,
+    "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+    "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+    "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0"
+  },
+  "sourceEnd": {
+    "commit": "ddb2c62d5a107c23f419d34d3220abec3e1e7d24",
+    "dirty": true,
+    "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+    "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+    "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0"
+  },
+  "packages": {
+    "panel": "0.19.2",
+    "door": "0.7.2",
+    "sdk": "0.1.1"
+  },
+  "vsixSha256": "7c7ecfa0f943a74e7427e238f481cef15d3349c9b799c1bf0d7618e247a2f7b0",
+  "capabilities": {
+    "nativeChat": true
+  },
+  "checks": [
+    {
+      "name": "extension activation",
+      "status": "passed"
+    },
+    {
+      "name": "isolated observation loaded",
+      "status": "passed"
+    },
+    {
+      "name": "native commands",
+      "status": "passed"
+    },
+    {
+      "name": "runtime providers",
+      "status": "passed"
+    },
+    {
+      "name": "one shared connection",
+      "status": "passed"
+    },
+    {
+      "name": "isolated endpoint home",
+      "status": "passed"
+    },
+    {
+      "name": "native configuration diagnosis",
+      "status": "passed"
+    },
+    {
+      "name": "diagnosis clipboard",
+      "status": "passed"
+    },
+    {
+      "name": "editor active theme 1",
+      "status": "passed"
+    },
+    {
+      "name": "editor active theme 2",
+      "status": "passed"
+    },
+    {
+      "name": "editor active theme 3",
+      "status": "passed"
+    },
+    {
+      "name": "native keyboard changes tree selection",
+      "status": "passed"
+    },
+    {
+      "name": "editor reduced motion configuration",
+      "status": "passed"
+    },
+    {
+      "name": "Problems finding",
+      "status": "passed"
+    },
+    {
+      "name": "native full report",
+      "status": "passed"
+    },
+    {
+      "name": "run view",
+      "status": "passed"
+    },
+    {
+      "name": "reference document is unsaved",
+      "status": "passed"
+    },
+    {
+      "name": "native participant registered",
+      "status": "passed"
+    },
+    {
+      "name": "native Chat receives unsaved file reference",
+      "status": "passed"
+    },
+    {
+      "name": "native history pagination",
+      "status": "passed"
+    },
+    {
+      "name": "native history search",
+      "status": "passed"
+    },
+    {
+      "name": "native Markdown export",
+      "status": "passed"
+    },
+    {
+      "name": "finding quick fix action",
+      "status": "passed"
+    },
+    {
+      "name": "fix preview without source mutation",
+      "status": "passed"
+    },
+    {
+      "name": "native diff preview",
+      "status": "passed"
+    },
+    {
+      "name": "approved single fix stays unsaved",
+      "status": "passed"
+    },
+    {
+      "name": "save and review uses new snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "stale diagnostics removed",
+      "status": "passed"
+    },
+    {
+      "name": "explicit retry new identity",
+      "status": "passed"
+    },
+    {
+      "name": "cleanup preserves referenced case and newer findings",
+      "status": "passed"
+    },
+    {
+      "name": "finished cleanup protects open evidence",
+      "status": "passed"
+    },
+    {
+      "name": "window reopen restores review",
+      "status": "passed"
+    },
+    {
+      "name": "native model configuration diagnosis",
+      "status": "passed"
+    },
+    {
+      "name": "native draft persistence",
+      "status": "passed"
+    },
+    {
+      "name": "window reopen restores draft",
+      "status": "passed"
+    },
+    {
+      "name": "native composer workspace file search",
+      "status": "passed"
+    },
+    {
+      "name": "native composer unsaved file snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "native composer selection snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "native composer manual skill attachment",
+      "status": "passed"
+    },
+    {
+      "name": "native composer offline project skill search",
+      "status": "passed"
+    },
+    {
+      "name": "native composer offline project skill body",
+      "status": "passed"
+    },
+    {
+      "name": "native composer Git diff snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "native composer Problems snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "native composer immutable context",
+      "status": "passed"
+    },
+    {
+      "name": "native composer context queue",
+      "status": "passed"
+    },
+    {
+      "name": "native composer context transmission",
+      "status": "passed"
+    },
+    {
+      "name": "native slash commands",
+      "status": "passed"
+    },
+    {
+      "name": "native workflow baseline",
+      "status": "passed"
+    },
+    {
+      "name": "native workflow diff",
+      "status": "passed"
+    },
+    {
+      "name": "native workflow undo",
+      "status": "passed"
+    },
+    {
+      "name": "native workflow undo conflict",
+      "status": "passed"
+    },
+    {
+      "name": "native test task pass",
+      "status": "passed"
+    },
+    {
+      "name": "native test task fail",
+      "status": "passed"
+    },
+    {
+      "name": "native test result attachment",
+      "status": "passed"
+    },
+    {
+      "name": "native test task cancellation",
+      "status": "passed"
+    },
+    {
+      "name": "native session switch blocks undo",
+      "status": "passed"
+    },
+    {
+      "name": "native test blocks history switch",
+      "status": "passed"
+    },
+    {
+      "name": "native test blocks session adoption",
+      "status": "passed"
+    },
+    {
+      "name": "native model picker rechecks running task",
+      "status": "passed"
+    },
+    {
+      "name": "native history clears workflow records",
+      "status": "passed"
+    },
+    {
+      "name": "no editor completion commands",
+      "status": "passed"
+    },
+    {
+      "name": "no editor completion payload",
+      "status": "passed"
+    },
+    {
+      "name": "no code completion capability",
+      "status": "passed"
+    },
+    {
+      "name": "review baseline has no chat turn",
+      "status": "passed"
+    },
+    {
+      "name": "real repair baseline test fails",
+      "status": "passed"
+    },
+    {
+      "name": "independent repair test passes",
+      "status": "passed"
+    },
+    {
+      "name": "repair and re-review share saved case",
+      "status": "passed"
+    },
+    {
+      "name": "native durable case report",
+      "status": "passed"
+    },
+    {
+      "name": "window reopen keeps complete saved report",
+      "status": "passed"
+    },
+    {
+      "name": "offline saved repair and test history",
+      "status": "passed"
+    },
+    {
+      "name": "native file editor opens",
+      "status": "passed"
+    },
+    {
+      "name": "composer captures opened editor",
+      "status": "passed"
+    }
+  ]
+}

@@ -1,0 +1,126 @@
+{
+  "schemaVersion": 2,
+  "status": "passed",
+  "platform": "win32",
+  "source": {
+    "commit": "ddb2c62d5a107c23f419d34d3220abec3e1e7d24",
+    "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+    "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+    "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0"
+  },
+  "sourceStart": {
+    "commit": "ddb2c62d5a107c23f419d34d3220abec3e1e7d24",
+    "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+    "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+    "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0"
+  },
+  "sourceEnd": {
+    "commit": "ddb2c62d5a107c23f419d34d3220abec3e1e7d24",
+    "fingerprint": "6f851e33ea325141a5cae1bfa3feeb445be368b14840c5fbeb2e4ff4e73dd9bb",
+    "toolFingerprint": "7db64dae934ffbcbb79372440f715376d0746c556ae6bb5b43dd580a9266a64c",
+    "lockFingerprint": "f6aa97f747cc7f5c6dc688f188971a12dd452beca9cb0011967dd44d071c80a0"
+  },
+  "packages": {
+    "panel": "0.19.2",
+    "door": "0.7.2",
+    "sdk": "0.1.1"
+  },
+  "runtime": {
+    "version": "0.2.2-rc.1",
+    "acpVersion": "0.2.2-rc.1",
+    "distribution": "npm"
+  },
+  "stages": [
+    {
+      "name": "package",
+      "status": "passed"
+    },
+    {
+      "name": "loopback-environment",
+      "status": "passed"
+    },
+    {
+      "name": "runtime",
+      "status": "passed"
+    },
+    {
+      "name": "installation",
+      "status": "passed"
+    },
+    {
+      "name": "startup",
+      "status": "passed"
+    },
+    {
+      "name": "handshake",
+      "status": "passed"
+    },
+    {
+      "name": "status",
+      "status": "passed"
+    },
+    {
+      "name": "session",
+      "status": "passed"
+    },
+    {
+      "name": "text-generation",
+      "status": "passed"
+    },
+    {
+      "name": "model-switch",
+      "status": "passed"
+    },
+    {
+      "name": "preset-switch",
+      "status": "passed"
+    },
+    {
+      "name": "stream",
+      "status": "passed"
+    },
+    {
+      "name": "permissions",
+      "status": "passed"
+    },
+    {
+      "name": "tools",
+      "status": "passed"
+    },
+    {
+      "name": "permission-request",
+      "status": "passed"
+    },
+    {
+      "name": "permission-cancel",
+      "status": "passed"
+    },
+    {
+      "name": "history",
+      "status": "passed"
+    },
+    {
+      "name": "editor-context-snapshot",
+      "status": "passed"
+    },
+    {
+      "name": "resume",
+      "status": "passed"
+    },
+    {
+      "name": "cancel",
+      "status": "passed"
+    },
+    {
+      "name": "cleanup",
+      "status": "passed"
+    }
+  ],
+  "checks": [],
+  "artifacts": [
+    {
+      "kind": "tgz",
+      "sha256": "56c13303a8a07d718941afd93debb43144e73f33fc651b9df7d61f80267b3b56"
+    }
+  ]
+}

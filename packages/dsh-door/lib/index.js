@@ -50,8 +50,8 @@ import {
 import { createSessionQueryHistory } from './kernel/history.js';
 import { archiveSnapshot, registerHistorySession } from './kernel/history-archive.js';
 import { createPermissionHandler } from './kernel/permissions.js';
-import { handleTextGeneration, rememberTextModelRequest, textGenerationSupported } from './kernel/text-generation.js';
-import { ACP_RUNTIME_VERSION } from './kernel/runtime.js';
+import { handleTextGeneration, textGenerationSupported } from './kernel/text-generation.js';
+import { ACP_RUNTIME_VERSION, ACP_TARGET_VERSION } from './kernel/runtime.js';
 import { handleImageCapabilities, rememberImageProtocolRequest, closeImageCapabilityRequests, projectHistoryImages, handleHistoryImageRead } from './kernel/images.js';
 import { IdeBridge } from './bridge/runtime.js';
 import { createEndpoint } from './bridge/endpoint.js';
@@ -350,7 +350,6 @@ export function gatePrompts(source, state, diag) {
             }
           }
           rememberSessionRequest(line, state, diag);
-          rememberTextModelRequest(incoming, state);
           await holdUntilMounted(line, state, diag);
           controller.enqueue(encoder.encode(line));
         }
@@ -584,7 +583,7 @@ function isPresetLocked(error) {
  *   `DSH_ACP_DOOR_DIAG`）。不配置则完全不写入。
  */
 export function apply(ctx, config = {}) {
-  if (ACP_RUNTIME_VERSION !== '0.2.1-rc.5') throw new Error('dsh-acp-door 需要 DSH ACP 0.2.1-rc.5，请升级内核后重试。');
+  if (ACP_RUNTIME_VERSION !== ACP_TARGET_VERSION) throw new Error(`dsh-acp-door 需要 DSH ACP ${ACP_TARGET_VERSION}，请使用配套内核后重试。`);
   registerCompanion(ctx);
   const { host, rejected: rejectedHost } = resolveDoorHost(config);
   const port = resolveDoorPort(config, process.env);

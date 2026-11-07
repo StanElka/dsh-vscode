@@ -7,11 +7,12 @@ const { createHash } = require('node:crypto');
 const { runDshSync } = require('../../packages/vscode-extension/src/door/locate');
 const { extractPackageArchive } = require('./package-archive.cjs');
 const ROOT = path.resolve(__dirname, '../..');
+const acpTarget = require('../../packages/dsh-door/package.json').peerDependencies['@deepseek-ai/dsh-acp'];
 const PILOTS = [
-  { name: '@michengai/dsh-code-review', version: '0.1.9', candidate: '0.1.9-ide.8',
+  { name: '@michengai/dsh-code-review', version: '0.1.9', candidate: '0.1.9-ide.9',
     sha256: 'd77a24a0f54c69728112fbd6817c643c1489f006045cefb6d328bab1d9bdc606',
     runtimeSha256: '7df2296398e2508af6dd87525bf0c3af2ae56c9f7ed182334228532a1326b54d', key: 'review' },
-  { name: '@linxin666/dsh-client-ui-skill-explorer', version: '0.4.4', candidate: '0.4.4-ide.7',
+  { name: '@linxin666/dsh-client-ui-skill-explorer', version: '0.4.4', candidate: '0.4.4-ide.8',
     sha256: 'd09440cf5557d3e3bf09a35fbea05f3fbfae073e25b3658344bd63d95a666862', key: 'skills' },
 ];
 /** Bind an isolated pilot build by current adapter version and exact archive bytes. */
@@ -71,8 +72,9 @@ function build({ home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh'),
       execFileSync(process.execPath, ['--check', path.join(target, 'lib', name)], { windowsHide: true, timeout: 10000, stdio: 'pipe' });
     }
     manifest.version = pilot.candidate;
-    for (const name of Object.keys(manifest.peerDependencies || {})) if (name.startsWith('@deepseek-ai/dsh')) manifest.peerDependencies[name] = '0.2.1-rc.5';
-    if (manifest.dsh?.engines?.dsh) manifest.dsh.engines.dsh = '0.2.1-rc.5';
+    if (pilot.key === 'review') manifest.peerDependencies['@deepseek-ai/dsh-tool-executor-native'] = acpTarget;
+    for (const name of Object.keys(manifest.peerDependencies || {})) if (name.startsWith('@deepseek-ai/dsh')) manifest.peerDependencies[name] = acpTarget;
+    if (manifest.dsh?.engines?.dsh) manifest.dsh.engines.dsh = acpTarget;
     manifest.dependencies = { ...manifest.dependencies, 'dsh-ide-bridge-sdk': JSON.parse(fs.readFileSync(path.join(ROOT, 'packages/dsh-bridge-sdk/package.json'))).version };
     manifest.dshIdeBridge = { upstreamVersion: pilot.version, upstreamEntrySha256: hash, protocolVersion: 1,
       modificationNotice: 'Modified by DSH in VS Code to register IDE Bridge capabilities and declare the SDK dependency.' };

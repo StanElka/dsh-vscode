@@ -1,5 +1,5 @@
 'use strict';
-/** DSH rc.3 starts a child session through activation. */
+/** DSH starts a child session through activation. */
 async function startReviewSubagent(ctx, request) {
   if (typeof ctx.subagents.startActivation !== 'function') throw new Error('内核未提供受支持的子 Agent 启动接口');
   const { label, signal, persona, ...input } = request;
@@ -18,6 +18,7 @@ function patchReviewRuntime(original) {
     ['!provider.capabilities.persona', '!provider.capabilities.agentPreset'],
     ['signal: combined, persona: REVIEW_PROMPT,', 'signal: combined,'],
     ['configureReviewer(agent, locale = readHostLocale(agent.ctx))', 'configureReviewer(agent, locale = readHostLocale(agent.ctx), structured = false)'],
+    ["agent.ctx.tools.presentAs('native');", 'agent.ctx.tools.setExecutor(new NativeToolExecutor(agent.ctx));'],
     ['text: outputLanguage(locale)', 'text: structured ? `Return only the JSON object required by the review rubric. Write title, body, and overall_explanation in ${locale === "en" ? "English" : "Simplified Chinese"}. Use absolute_file_path and the shortest valid line_range for every finding. Do not add prose or markdown fences.` : outputLanguage(locale)'],
     ['locale = readHostLocale(ctx))', 'locale = readHostLocale(ctx), structured = false, budget)'],
     ['const prompt = await reviewPrompt(target, cwd, combined);', `const prompt = await reviewPrompt(target, cwd, combined);
@@ -38,6 +39,6 @@ function patchReviewRuntime(original) {
     if (result.split(from).length !== 2) throw new Error('审查格式补丁定位失败');
     result = result.replace(from,to);
   }
-  return `import contextRuntime from './review-context.cjs';\nconst { prepareReviewContext, hasReviewMaterial, isInspectionTool } = contextRuntime;\n${startReviewSubagent.toString()}\n${result}`;
+  return `import { NativeToolExecutor } from '@deepseek-ai/dsh-tool-executor-native';\nimport contextRuntime from './review-context.cjs';\nconst { prepareReviewContext, hasReviewMaterial, isInspectionTool } = contextRuntime;\n${startReviewSubagent.toString()}\n${result}`;
 }
 module.exports = { patchReviewRuntime, startReviewSubagent };

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createHash } from 'node:crypto';
 import { rememberImageProtocolRequest, rememberImageProtocolResponse, resolveImageCapabilities, handleImageCapabilities, closeImageCapabilityRequests, projectHistoryImages, handleHistoryImageRead } from '../lib/kernel/images.js';
+import { ACP_TARGET_VERSION } from '../lib/kernel/runtime.js';
 import { decorateLine } from '../lib/frames.js';
 import { gatePrompts } from '../lib/index.js';
 import { sessionTranscript as doorTranscript } from '../lib/history-events.js';
@@ -12,9 +13,9 @@ async function check(name, fn) { await fn(); passed++; console.log(`  PASS ${nam
 const attachments = { imageLimits: { maxImageBytes: 1024, maxImagesPerMessage: 4, maxMessageImageBytes: 2048, mediaTypes: ['image/png', 'image/jpeg'] }, saveImages() {}, readImage() {} };
 const tools = { schemas() { return [{ name: 'send_meme' }, { name: 'image_search' }, { name: 'generate_image' }, { name: 'read_file' }]; } };
 function stateOf() {
-  const agent = { ctx: { get(name) { return name === 'tools' ? tools : undefined; } } };
-  return { imageRuntimeVersion: '0.2.1-rc.5', imagePromptEnabled: true, imageAttachments: attachments,
-    sessions: new Set(['own']), agentsBySession: new Map([['own', agent]]), textModels: new Map([['own', { provider: 'p', model: 'vision' }]]),
+  const agent = { model: { current: () => ({ provider: 'p', model: 'vision' }) }, ctx: { get(name) { return name === 'tools' ? tools : undefined; } } };
+  return { imageRuntimeVersion: ACP_TARGET_VERSION, imagePromptEnabled: true, imageAttachments: attachments,
+    sessions: new Set(['own']), agentsBySession: new Map([['own', agent]]),
     textLlm: { async resolveModelInfo(provider, model) { return { provider, id: model, inputModalities: ['text', 'image'] }; } } };
 }
 await check('native capability comes from the exact current owned route and attachment deployment', async () => {
@@ -40,7 +41,7 @@ await check('unknown metadata, text-only model and unverified runtime refuse ima
 await check('missing services or model route do not inherit stale agent options', async () => {
   const state = stateOf(); state.imageAttachments = undefined;
   assert.equal((await resolveImageCapabilities(state, 'own')).reason, 'attachment-service-unavailable');
-  state.imageAttachments = attachments; state.textModels.clear();
+  state.imageAttachments = attachments; state.agentsBySession.get('own').model.current = () => undefined;
   state.agentsBySession.get('own').options = { provider: 'old', model: 'old-image-model' };
   const result = await resolveImageCapabilities(state, 'own');
   assert.equal(result.reason, 'model-route-unresolved'); assert.equal(result.provider, undefined);
@@ -61,7 +62,7 @@ await check('model changes, closed sessions and caller aborts invalidate an in-f
   const state = stateOf(); let release;
   state.textLlm.resolveModelInfo = () => new Promise(resolve => { release = resolve; });
   const query = resolveImageCapabilities(state, 'own');
-  state.textModels.set('own', { provider: 'p', model: 'text' }); release({ inputModalities: ['image'] });
+  state.agentsBySession.get('own').model.current = () => ({ provider: 'p', model: 'text' }); release({ inputModalities: ['image'] });
   await assert.rejects(() => query, error => error.code === -32042);
   const closed = resolveImageCapabilities(state, 'own'); state.sessions.delete('own'); release({ inputModalities: ['image'] });
   await assert.rejects(() => closed, error => error.code === -32003);
