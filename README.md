@@ -7,15 +7,15 @@
 本仓库由两个组成部分构成，两者都需要安装。
 
 
-升级版为面板 `0.19.1`、接入点 `0.7.1`：“工具”视图提供代码审查和技能浏览，更多菜单提供文件技能管理；运行记录支持恢复、重试、清理及将报告显式带入对话。可选原生 `@dsh` Chat 与完整会话 API 集成在同一个主扩展中，继续保持一个活动栏入口。
+升级版为面板 `0.19.2`、接入点 `0.7.2`：“工具”视图提供代码审查和技能浏览，更多菜单提供文件技能管理；运行记录支持恢复、重试、清理及将报告显式带入对话。可选原生 `@dsh` Chat 与完整会话 API 集成在同一个主扩展中，继续保持一个活动栏入口。
 面板输入框支持文件、选区、技能、Git 变更、问题诊断和内置命令；运行中可排队下一条消息，失败或停止后暂停队列。每轮回答附有改动与测试结果卡，当前窗口保留最近十轮差异，可查看旧轮差异、撤销最新轮的文件改动，并核对工作区测试结果是否已过期。
-面板还支持图片选择、粘贴、拖入和发送前预览，显示图片与 GIF，并兼容 `dsh-meme` 图库。普通图片输入依赖当前会话模型和内核声明的图片能力；当前原生适配范围为 DSH `0.2.1-rc.5`，具体格式、大小和历史读取边界见[面板说明](packages/vscode-extension/README.md)。
-原生 Chat 支持显式文件和选区引用，包括未保存的编辑器内容；历史列表支持搜索、翻页、项目筛选和 Markdown 导出。审查发现可生成只读修复建议，经差异预览确认后逐项应用，并保存后重新审查。无工具修复生成要求 ACP `0.2.1-rc.5` 的直接文本能力；能力缺失时提示手动修复，不启动普通工具会话。
+面板还支持图片选择、粘贴、拖入和发送前预览，显示图片与 GIF，并兼容 `dsh-meme` 图库。普通图片输入依赖当前会话模型和内核声明的图片能力；当前原生适配范围为 DSH `0.2.2-rc.1`，具体格式、大小和历史读取边界见[面板说明](packages/vscode-extension/README.md)。
+原生 Chat 支持显式文件和选区引用，包括未保存的编辑器内容；历史列表支持搜索、翻页、项目筛选和 Markdown 导出。审查发现可生成只读修复建议，经差异预览确认后逐项应用，并保存后重新审查。无工具修复生成要求 ACP `0.2.2-rc.1` 的直接文本能力；能力缺失时提示手动修复，不启动普通工具会话。
 完整审查报告保存到本地，离线和重开窗口后可阅读。实际应用的修复、修复前测试、每次重测和后续审查保留关联记录；测试直接依据选中的审查工作区，无需聊天轮次。
 两个试点插件需要安装带 Bridge 注册补丁的适配包，发行附件保留原作者来源；市场中的原版插件继续保留原有入口。见下文安装方法。
 提供方 SDK `0.1.1` 包含类型、注册与校验助手、模拟宿主和独立示例，见 [SDK 文档](packages/dsh-bridge-sdk/README.md)。
 
-当前仅维护 DSH `0.2.1-rc.5`（npm 与 Desktop 发行方式）。历史使用内核公开 `sessionQuery`，权限使用 catalog 接口；不再提供更早内核的适配和本地 v3 文件读取。当前候选的验收状态见 [`compat/versions.json`](compat/versions.json)。
+当前仅维护 DSH `0.2.2-rc.1`（npm 与 Desktop 发行方式）。历史使用内核公开 `sessionQuery`，权限使用 catalog 接口；不再提供更早内核的适配和本地 v3 文件读取。当前候选的验收状态见 [`compat/versions.json`](compat/versions.json)。
 
 | 包 | 内容 | 安装位置 |
 | --- | --- | --- |
@@ -134,7 +134,7 @@ DSH Desktop 0.2 无需另外把 `dsh` 加入 `PATH`：扩展会自动查找 Desk
 
 仅安装接入点可以使用普通聊天、模型、权限及历史功能。原生代码审查和技能管理还需要主动注册 Bridge 能力的提供方。发布版提供基于 `@michengai/dsh-code-review@0.1.9`、`@linxin666/dsh-client-ui-skill-explorer@0.4.4` 的适配归档，保留上游许可证和原有桌面入口；适配源码及精确来源校验见 `tools/bridge/build-pilots.cjs`。
 
-当前源码对应未完成发行验收的候选包。开发验收时，先用下文的构建命令生成接入点、SDK 和 VSIX，再运行 `node tools/bridge/build-pilots.cjs` 生成 `build/ide-bridge/pilots/` 下的 `michengai-dsh-code-review-0.1.9-ide.8.tgz` 与 `linxin666-dsh-client-ui-skill-explorer-0.4.4-ide.7.tgz`。使用同一轮候选归档，在专用验收配置集中安装：
+当前源码对应未完成发行验收的候选包。开发验收时，先用下文的构建命令生成接入点、SDK 和 VSIX，再运行 `node tools/bridge/build-pilots.cjs` 生成 `build/ide-bridge/pilots/` 下的 `michengai-dsh-code-review-0.1.9-ide.9.tgz` 与 `linxin666-dsh-client-ui-skill-explorer-0.4.4-ide.8.tgz`。使用同一轮候选归档，在专用验收配置集中安装：
 
 ```sh
 dsh plugin --profile <验收配置集> add file:<接入点候选路径>.tgz file:<SDK候选路径>.tgz file:<审查适配包路径>.tgz file:<技能适配包路径>.tgz
@@ -191,8 +191,8 @@ node packages/dsh-door/tools/publish.cjs --candidate <候选接入点.tgz> # 检
 ```sh
 pnpm compat:doctor -- --json
 pnpm compat:contracts
-pnpm compat:test -- --dsh 0.2.1-rc.5 --tgz <候选接入点.tgz>
-pnpm compat:test -- --dsh 0.2.1-rc.5 --install --tgz <候选接入点.tgz>
+pnpm compat:test -- --dsh 0.2.2-rc.1 --tgz <候选接入点.tgz>
+pnpm compat:test -- --dsh 0.2.2-rc.1 --install --tgz <候选接入点.tgz>
 pnpm compat:release-check -- --evidence <验收证据清单.json>
 ```
 

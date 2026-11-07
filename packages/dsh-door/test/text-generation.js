@@ -1,20 +1,22 @@
 import assert from 'node:assert/strict';
-import { generateTextOnly, handleTextGeneration, rememberTextModelRequest, rememberTextModelResponse, textGenerationSupported } from '../lib/kernel/text-generation.js';
+import { generateTextOnly, handleTextGeneration, textGenerationSupported } from '../lib/kernel/text-generation.js';
+
+import { ACP_TARGET_VERSION } from '../lib/kernel/runtime.js';
 
 const signal = new AbortController().signal;
 let requests = 0, toolExecutions = 0;
 const llm = { async *stream(options) {
-  requests++; assert.deepEqual(options.tools, []); assert.equal(options.messages.length, 1);
+  requests++; assert.equal(options.model, requests === 1 ? 'fixture' : 'switched'); assert.deepEqual(options.tools, []); assert.equal(options.messages.length, 1);
   yield { type: 'text-delta', index: 0, text: '{"edits":[]}' };
   yield { type: 'block-end', index: 0, block: { type: 'text', text: '{"edits":[]}' } };
   yield { type: 'finish', reason: { kind: 'stop' } };
 }, execute() { toolExecutions++; } };
 assert(!textGenerationSupported(llm, '0.2.1-rc.2'));
-assert(textGenerationSupported(llm, '0.2.1-rc.5'));
-for (const version of ['0.2.1-rc.6', '0.2.1', undefined]) assert(!textGenerationSupported(llm, version));
+assert(textGenerationSupported(llm, ACP_TARGET_VERSION));
+for (const version of ['0.2.1-rc.5', '0.2.2-rc.2', '0.2.1', undefined]) assert(!textGenerationSupported(llm, version));
 assert(!textGenerationSupported(llm, '0.2.0-rc.2'));
 assert(!textGenerationSupported({}, '0.2.1-rc.2'));
-assert(!textGenerationSupported({}, '0.2.1-rc.5'));
+assert(!textGenerationSupported({}, ACP_TARGET_VERSION));
 const options = { prompt: 'suggest a repair', provider: 'fixture', model: 'fixture', signal };
 assert.deepEqual(await generateTextOnly(llm, options), { text: '{"edits":[]}', path: 'llm-direct-v1', tools: false });
 for (const chunk of [{ type: 'tool-call-delta' }, { type: 'block-start', blockType: 'tool-call' }, { type: 'block-end', block: { type: 'tool-call' } }]) {
@@ -25,30 +27,14 @@ for (const chunk of [{ type: 'tool-call-delta' }, { type: 'block-start', blockTy
 for (const reason of [{ kind: 'error' }, { kind: 'aborted' }, { kind: 'length' }]) await assert.rejects(generateTextOnly({ async *stream() { yield { type: 'finish', reason }; } }, options));
 await assert.rejects(generateTextOnly({ async *stream() { yield { type: 'text-delta', index: 0, text: 'x'.repeat(262145) }; } }, options), /过大/);
 const abort = new AbortController(); abort.abort(); await assert.rejects(generateTextOnly(llm, { ...options, signal: abort.signal }));
-const responses = [], state = { textLlm: llm, textGeneration: true, textRuns: new Map(), sessions: new Set(['owned']), agentsBySession: new Map([['owned', { options: { provider: 'fixture', model: 'fixture' } }]]), respond: response => responses.push(response) };
-const projection = model => [{ id: 'model', type: 'select', currentValue: JSON.stringify(['fixture', model]) }];
-rememberTextModelRequest({ id: 20, method: 'session/new' }, state);
-rememberTextModelResponse({ id: 20, result: { sessionId: 'owned', configOptions: projection('fixture') } }, state);
-assert.deepEqual(state.textModels.get('owned'), { provider: 'fixture', model: 'fixture' });
-rememberTextModelRequest({ id: 21, method: 'session/set_config_option', params: { sessionId: 'owned', value: 'untrusted-request' } }, state);
-rememberTextModelResponse({ id: 21, error: { code: -32602 } }, state);
-assert.equal(state.textModels.get('owned').model, 'fixture');
-rememberTextModelRequest({ id: 22, method: 'session/set_config_option', params: { sessionId: 'owned' } }, state);
-rememberTextModelResponse({ id: 22, result: { configOptions: projection('changed') } }, state);
-assert.equal(state.textModels.get('owned').model, 'changed');
-rememberTextModelResponse({ method: 'session/update', params: { sessionId: 'owned', update: { sessionUpdate: 'config_option_update', configOptions: projection('fixture') } } }, state);
-rememberTextModelResponse({ method: 'session/update', params: { sessionId: 'foreign', update: { sessionUpdate: 'config_option_update', configOptions: projection('foreign') } } }, state);
-assert.equal(state.textModels.has('foreign'), false); assert.equal(state.textModelRequests.size, 0);
-rememberTextModelRequest({ id: 23, method: 'session/set_config_option', params: { sessionId: 'owned' } }, state);
-rememberTextModelResponse({ id: 23, result: { configOptions: [{ id: 'model', type: 'select', currentValue: 'unknown-format' }] } }, state);
-assert.equal(state.textModels.has('owned'), false, 'Unknown server projection cannot retain an old route');
+let selection;
+const responses = [], state = { textLlm: llm, textGeneration: true, textRuns: new Map(), sessions: new Set(['owned']), agentsBySession: new Map([['owned', { model: { current: () => selection }, options: { provider: 'initial', model: 'initial' } }]]), respond: response => responses.push(response) };
 const beforeMissingRoute = requests;
 handleTextGeneration({ id: 25, method: 'dsh-door/text/generate', params: { sessionId: 'owned', prompt: 'x' } }, state);
 await Promise.allSettled([...state.textPending]);
 assert.equal(responses.find(item => item.id === 25).error.code, -32042);
 assert.equal(requests, beforeMissingRoute, 'An unavailable current model must not call the initial route');
-rememberTextModelRequest({ id: 24, method: 'session/resume', params: { sessionId: 'owned' } }, state);
-rememberTextModelResponse({ id: 24, result: { configOptions: projection('fixture') } }, state);
+selection = { provider: 'fixture', model: 'switched' };
 assert(handleTextGeneration({ id: 1, method: 'dsh-door/text/generate', params: { sessionId: 'foreign', prompt: 'x' } }, state));
 assert.equal(responses.find(item => item.id === 1).error.code, -32003); assert.equal(requests, 1);
 assert(handleTextGeneration({ id: 2, method: 'dsh-door/text/generate', params: { sessionId: 'owned', prompt: 'x' } }, state));

@@ -8,7 +8,7 @@
 
 需要已安装并运行的 DeepSeek Harness，以及支持 ACP 的外部客户端。接入点仅供本机使用；安装后需重启对应的 DSH 内核。
 
-`dsh-door/images/capabilities`（`{sessionId}`）检查当前连接所属会话的模型是否声明图片输入、原生附件服务是否可用，以及初始化连接时是否启用了图片。当前验证范围为 ACP `0.2.1-rc.5`，发送仍使用标准 ACP 图片内容块。模型切换后重新查询；原连接禁用图片时需要重连。相关工具清单来自当前 Agent 可见的注册名称，不能据此保证外部搜图或图片生成服务可用。
+`dsh-door/images/capabilities`（`{sessionId}`）检查当前连接所属会话的模型是否声明图片输入、原生附件服务是否可用，以及初始化连接时是否启用了图片。当前验证范围为 ACP `0.2.2-rc.1`，发送仍使用标准 ACP 图片内容块。模型切换后重新查询；原连接禁用图片时需要重连。相关工具清单来自当前 Agent 可见的注册名称，不能据此保证外部搜图或图片生成服务可用。
 
 成功读取历史后，图片以不含原生附件标识的临时引用返回。客户端通过 `dsh-door/images/read`（`{token}`）读取该连接已取得的图片引用；未知或其他连接的引用被拒绝。历史图片按格式、内容摘要和大小校验，并受并发、超时和取消限制。
 
@@ -50,7 +50,7 @@ dsh plugin --profile <your-profile> update dsh-acp-door
 
 Restart the kernel afterwards.
 
-Compatibility: DSH `0.2.1-rc.5` only. Current candidate acceptance is recorded in the compatibility matrix.
+Compatibility: DSH `0.2.2-rc.1` only. Current candidate acceptance is recorded in the compatibility matrix.
 
 </details>
 
@@ -225,7 +225,7 @@ DSH 冷启动时，插件会先等待用户设置加载完成再开放端口，�
 
 | DSH | 历史会话 | 权限预设 |
 | --- | --- | --- |
-| `0.2.1-rc.5` | 公开 `sessionQuery` 服务 | `catalog/current/resolve/set` |
+| `0.2.2-rc.1` | 公开 `sessionQuery` 服务 | `catalog/current/resolve/set` |
 
 接入点只接受该精确 ACP 版本；历史持久格式和迁移均由内核负责。状态中的 `protocolVersion` 与 `runtime.acpVersion` 分别报告接入协议及实际 ACP 包版本；历史服务不可用时报告 `history: false`。
 

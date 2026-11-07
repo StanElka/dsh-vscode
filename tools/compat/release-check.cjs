@@ -142,7 +142,7 @@ function validateReport(report, current, state, expected = {}) {
   if (Array.isArray(report?.stages) && report.stages.some(stage => stage?.status !== 'passed' && !(stage?.required === false && stage.status === 'not-applicable'))) issues.push('内核报告仍有失败、跳过或必测环境缺失');
   if (!semver.satisfies(report?.runtime?.version || '', current?.peer || '')) issues.push('运行时不在当前兼容声明中');
   if (!semver.satisfies(report?.runtime?.acpVersion || '', current?.peer || '')) issues.push('实际 ACP 缺失或不在依赖声明中');
-  if (['0.2.1-rc.3', '0.2.1-rc.5'].includes(report?.runtime?.acpVersion)) issues.push(...required(report?.stages, ['text-generation'], '直接无工具生成必测'));
+  if (['0.2.1-rc.3', '0.2.1-rc.5', '0.2.2-rc.1'].includes(report?.runtime?.acpVersion)) issues.push(...required(report?.stages, ['text-generation'], '直接无工具生成必测'));
   for (const key of ['dsh', 'distribution']) if (expected[key] && report?.runtime?.[key === 'dsh' ? 'version' : key] !== expected[key]) issues.push(`运行时 ${key} 与矩阵不匹配`);
   const artifacts = Array.isArray(report?.artifacts) ? report.artifacts.filter(item => item.kind === 'tgz') : [];
   if (artifacts.length !== 1 || !digest(artifacts[0].sha256) || expected.tgzSha256 && artifacts[0].sha256 !== expected.tgzSha256) issues.push('内核未验收同一份最终 tgz');

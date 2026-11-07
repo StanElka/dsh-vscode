@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const net = require('node:net');
 const assert = require('node:assert/strict');
-const { ROOT, resolveRuntime, locate, runDir, sha256, redact, sourceState } = require('../compat/lib.cjs');
+const { ROOT, versions, resolveRuntime, locate, runDir, sha256, redact, sourceState } = require('../compat/lib.cjs');
 const { fixtureProvider } = require('../compat/fixture-provider.cjs');
 const { DoorClient } = require('../../packages/vscode-extension/src/door/client');
 const { BridgeClient } = require('../../packages/vscode-extension/src/bridge/client');
@@ -20,7 +20,7 @@ async function run() {
   const work = resources.work; resources.override(resources.childEnv());
   const start = sourceState();
   const report = { schemaVersion: 2, time: new Date().toISOString(), source: start, sourceStart: start, platform: process.platform,
-    packages: require('../compat/lib.cjs').versions(), status: 'failed', stages: [], artifacts: [] };
+    packages: versions(), status: 'failed', stages: [], artifacts: [] };
   const previous = process.env.DSH_HOME;
   const proxy = Object.fromEntries(['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy'].map(k => [k, process.env[k]]));
   let kernel, model, client, bridge, session;
@@ -47,7 +47,7 @@ async function run() {
     for (const k of Object.keys(proxy)) delete process.env[k];
     const runtimeHome = path.join(work, 'home');
     process.env.DSH_HOME = runtimeHome; fs.mkdirSync(runtimeHome, { recursive: true });
-    const runtime = resolveRuntime({ dsh: versionArgument || '0.2.1-rc.5' }); report.runtime = runtime;
+    const runtime = resolveRuntime({ dsh: versionArgument || versions().peer }); report.runtime = runtime;
     const cwd = path.join(work, 'workspace'); fs.mkdirSync(cwd);
     fs.writeFileSync(path.join(cwd, 'sample.js'), 'export function sum(a, b) { return a - b; }\n');
     fs.writeFileSync(path.join(cwd, 'context-git.txt'), 'context-base\n');
